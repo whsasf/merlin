@@ -1,0 +1,22 @@
+---
+- hosts: directory
+  serial: 1
+  roles:
+    - owm-mta-configdb
+
+- hosts: fep
+  roles:
+    - common
+    - jdk
+    - owm-common
+    - owm-msg-common
+    - owm-imap
+    - owm-pop
+    - owm-mta
+    - owm-extserv
+#    - {role: owm-pab, pab_proxy: 1 }
+#    - {role: owm-cal, cal_proxy: 1 }
+# Monitor UI is now a separate component that installs the agents it needs
+#    - owm-logstash-shipper
+#    - owm-collectd
+

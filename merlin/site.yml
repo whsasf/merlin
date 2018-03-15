@@ -1,0 +1,26 @@
+---
+#- include: stresstest.yml
+- include: redis.yml
+- include: dns.yml
+- include: cassmeta.yml
+- include: cassblob.yml
+- include: directory.yml
+- include: mss.yml
+- include: queue.yml
+- include: pabcal.yml
+- include: search.yml
+- include: qadminsearch.yml
+- include: qservice.yml
+- include: fep.yml
+- include: smtpout.yml
+- include: smtpin.yml
+- include: razorgate.yml
+- include: uxsuite.yml
+- include: lawfulintercept.yml
+- include: elasticsearch.yml
+- include: monitorui.yml
+#- include: backup.yml
+- include: security.yml
+- include: recovery.yml
+- include: system-validation.yml
+- include: jmeter.yml

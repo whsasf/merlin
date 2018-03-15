@@ -1,0 +1,43 @@
+---     
+- name: Set confserv_ip_address variable
+  set_fact:
+      confserv_ip_address: "{% if groups['directory'] is defined %}{% for host in groups['directory'] %}{% if hostvars[host]['ethernet_interfaces'] is defined and hostvars[host]['primary'] is defined %}{% for interface in hostvars[host]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'admin' %}{{ interface['address'] }}{% endif %}{% endfor %}{% endif %}{% endfor %}{% endif %}"
+  tags: [ 'owm-system-validation' ]
+
+- name: Set confserv_user_info variable
+  set_fact:
+      confserv_user_info: "{{ hostvars[item]['emailmx_user'] }}"
+  with_items: "{{ groups['directory'] }}"
+  when: "hostvars[item]['primary'] is defined"
+  tags: [ 'owm-system-validation' ]
+
+- name: Set cassandra_user_info variable
+  set_fact:
+      cassandra_user_info: "{{ hostvars[item]['cass_user'] }}"
+  with_items: "{{ groups['cassmeta'] }}"
+  when: "hostvars[item]['master'] is defined"
+  tags: [ 'owm-system-validation' ]
+
+- name: Set localhost_ip_address variable
+  set_fact:
+      localhost_ip_address: "{{ hostvars[inventory_hostname]['ansible_all_ipv4_addresses'][0] }}"
+  tags: [ 'owm-system-validation' ]
+  
+- name: Copy sys_admin python file template to files folder.
+  template:
+    src: "sys_admin.py.j2"
+    dest: "./roles/owm-system-validation/files/sys_admin.py"
+    mode: 0644
+  tags: [ 'owm-system-validation' ]
+
+- name: Set maximum number lines limit for command output.
+  lineinfile: dest=roles/owm-system-validation/files/fetch_data.py regexp='max_number_of_lines =' line='max_number_of_lines = 50000' state=present create=yes
+  tags: [ 'owm-system-validation' ]
+
+- name: Give permission to sys-admin.py file
+  file: path=roles/owm-system-validation/files/sys_admin.py mode=0755
+  tags: [ 'owm-system-validation' ]
+
+- name: Run System validation Script
+  shell: ./roles/owm-system-validation/files/sys_admin.py ansible=True tomcat_path={{tomcat_server_install_dir}}/apache-tomcat-{{ tomcat_server_version }}/webapps/owm-system-validation confserv_ip={{confserv_ip_address}} mx_user_home={{confserv_user_info[0]['home']}} cass_user_home={{cassandra_user_info[0]['home']}}
+  tags: [ 'owm-system-validation' ]

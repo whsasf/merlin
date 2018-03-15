@@ -1,0 +1,216 @@
+---
+- name: Initialize CentOS7 repo
+  copy:
+    src: "centos7.repo"
+    dest: "/etc/yum.repos.d/centos.repo"
+    mode: 0644
+  tags: ['owm-affinity']
+
+- name: Task to move centos.repo to centos.repo_orig
+  shell: mv /etc/yum.repos.d/centos.repo /etc/yum.repos.d/centos.repo_orig
+  tags: ['owm-affinity']
+  
+- name: Check if Resource-agent is installed
+  shell: rpm -q resource-agents
+  register: RESOURCE
+  failed_when: RESOURCE.rc > 1
+  ignore_errors: true
+  changed_when: no
+  tags: ['owm-affinity']
+  
+- name: Installing Resource-agent
+  yum: name=resource-agents 
+  when: RESOURCE.rc != 0
+  tags: ['owm-affinity']
+  
+- name: Task to move centos.repo_orig to centos.repo
+  shell: mv /etc/yum.repos.d/centos.repo_orig /etc/yum.repos.d/centos.repo
+  tags: ['owm-affinity']
+  
+- name: Check if pacemaker is installed
+  shell: rpm -q pacemaker
+  register: PACEMAKE
+  failed_when: PACEMAKE.rc > 1
+  ignore_errors: true
+  changed_when: no
+  tags: ['owm-affinity']
+
+- name: Installing pacemaker RPM's
+  yum: name=pacemaker state=present disable_gpg_check=yes
+  when: PACEMAKE.rc != 0
+  tags: ['owm-affinity']
+
+- name: Check if pcs is installed
+  shell: rpm -q pcs
+  register: PCS
+  failed_when: PCS.rc > 1
+  ignore_errors: true
+  changed_when: no
+  tags: ['owm-affinity']
+
+- name: Installing pcs RPM's
+  yum: name=pcs disable_gpg_check=yes
+  when: PCS.rc != 0
+  tags: ['owm-affinity']
+
+- name: Copying Nginx Heartbeat file
+  copy:
+    src: "nginx"
+    dest: "/usr/lib/ocf/resource.d/heartbeat/nginx"
+    mode: 0777
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: ['owm-affinity']
+  
+- name: To destroy the cluster configuration
+  command: "pcs cluster destroy"
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: ['owm-affinity']
+  
+- pause: seconds=20
+
+- name: Add alternate name for mss in /etc/hosts
+  lineinfile: dest=/etc/hosts state=present line='{% set mssaffinitygrpname = node_site+'-affinity-mss' %}{% if groups[mssaffinitygrpname] is defined %}{% for host in groups[mssaffinitygrpname] %}{% if hostvars[host]['clusterId']|string() == node_cluster|string() %}{{hostvars[host]['ansible_ssh_host']}} {{host}}-mss {% endif %}{% endfor %}{% endif %}'
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}" 
+  tags: ['owm-affinity']
+  
+- name: Add alternate name for mos in /etc/hosts
+  lineinfile: dest=/etc/hosts state=present line='{% set mosaffinitygrpname = node_site+'-affinity-mos' %}{% if groups[mosaffinitygrpname] is defined %}{% for host in groups[mosaffinitygrpname] %}{% if hostvars[host]['clusterId']|string() == node_cluster|string() %}{{hostvars[host]['ansible_ssh_host']}} {{host}}-mos{% endif %}{% endfor %}{% endif %}'
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}" 
+  tags: ['owm-affinity']  
+
+- name: Add alternate name for failover in /etc/hosts
+  lineinfile: dest=/etc/hosts state=present line='{% set failoveraffinitygrpname = node_site+'-affinity-failover' %}{% if groups[failoveraffinitygrpname] is defined %}{% for host in groups[failoveraffinitygrpname] %}{% if hostvars[host]['clusterId']|string() == node_cluster|string() %}{{hostvars[host]['ansible_ssh_host']}} {{host}}-failover {% endif %}{% endfor %}{% endif %}'
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}" 
+  tags: ['owm-affinity']  
+ 
+- name: To setup corosync.conf file
+  command: "cp /etc/corosync/corosync.conf.example /etc/corosync/corosync.conf"
+  with_items: "{{ groups[node_site + '-affinity'] }}"
+  when: hostvars['{{item}}']['clusterId'] == "{{ node_cluster }}"
+  tags: ['owm-affinity']
+
+- name: Start pcsd, pacemaker service in CentOS7
+  service: name={{item}} state=started
+  with_items:
+    - 'pcsd'
+    - 'pacemaker'
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: ['owm-affinity']
+
+- pause: seconds=20    
+ 
+- name: Needed commands for configuration
+  command: "{{item}}"
+  with_items:
+    - 'pcs property set stonith-enabled=false'
+    - 'pcs property set no-quorum-policy=freeze'
+  when: inventory_hostname in groups[node_site + '-affinity-mss'] and hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: ['owm-affinity']  
+  
+- name: Determine affinity mos name
+  set_fact:
+    mos_host: |
+      {% for host in groups[node_site + "-affinity-mos"] %}
+      {%- if hostvars[host]['clusterId']|string() == node_cluster|string() -%}
+      {{ host }}
+      {%- endif -%}
+      {% endfor %}
+  tags: [ 'owm-affinity']
+
+- name: Determine affinity mss name
+  set_fact:
+    mss_host: |
+      {% for host in groups[node_site + "-affinity-mss"] %}
+      {%- if hostvars[host]['clusterId']|string() == node_cluster|string() -%}
+      {{ host }}
+      {%- endif -%}
+      {% endfor %}
+  tags: [ 'owm-affinity' ]  
+
+- name: Determine affinity failover name
+  set_fact:
+    failover_host: |
+      {% for host in groups[node_site + "-affinity-failover"] %}
+      {%- if hostvars[host]['clusterId']|string() == node_cluster|string() -%}
+      {{ host }}
+      {%- endif -%}
+      {% endfor %}
+  tags: [ 'owm-affinity']   
+  
+- name: Copying password change file
+  copy:
+    src: "passchange"
+    dest: "{{ nginx_home_dir }}/passchange.sh"
+    mode: 0777
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: ['owm-affinity']
+
+- name: Copying cluster auth
+  copy:
+    src: "clusterauth"
+    dest: "{{ nginx_home_dir }}/clusterauth.sh"
+    mode: 0777
+  when: inventory_hostname in groups[node_site + '-affinity-mss'] and hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: ['owm-affinity']  
+  
+- name: Copying cluster setup for CentOS7
+  copy:
+    src: "clustersetup"
+    dest: "{{ nginx_home_dir }}/clustersetup.sh"
+    mode: 0777
+  when: inventory_hostname in groups[node_site + '-affinity-mss'] and hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: ['owm-affinity']  
+  
+- name: Changing password for user hacluster
+  shell: "bash {{ nginx_home_dir }}/passchange.sh"
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: ['owm-affinity']
+
+- pause: seconds=20
+
+- name: Authorise
+  command: "bash {{ nginx_home_dir }}/clusterauth.sh {{mss_host}} {{mos_host}} {{failover_host}}"
+  when: inventory_hostname in groups[node_site + '-affinity-mss'] and hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"  
+  tags: ['owm-affinity']
+ 
+- name: PCS Cluster Setup for CentOS7
+  command: "bash {{ nginx_home_dir }}/clustersetup.sh {{mss_host}} {{mos_host}} {{failover_host}}"
+  when: inventory_hostname in groups[node_site + '-affinity-mss'] and hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"  
+  tags: ['owm-affinity']
+ 
+- name: Start cluster
+  command: pcs cluster start --all
+  when: inventory_hostname in groups[node_site + '-affinity-mss'] and hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"  
+  tags: ['owm-affinity']
+  
+- name: Start Nginx on mss and mos nodes
+  shell: "{{ nginx_home_dir }}/nginx_{{ item }}/nginx{{ owm_nginx_version }}/scripts/nginx restart"
+  when: inventory_hostname in groups[node_site + '-affinity-{{item}}'] and hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  with_items:
+    - "mss"
+    - "mos"
+  tags: [ 'owm-affinity']
+
+- name: Start Nginx on failover node
+  command: "{{ nginx_home_dir }}/nginx_{{ item }}/nginx{{ owm_nginx_version }}/scripts/nginx restart"
+  when: inventory_hostname in groups[node_site + '-affinity-failover'] and hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  with_items:
+    - "mss"
+    - "mos"
+  tags: [ 'owm-affinity']    
+
+- name: Stop pcsd, pacemaker service in CentOS7
+  service: name={{item}} state=stopped
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  with_items:
+    - 'pcsd'
+    - 'pacemaker'
+  tags: ['owm-affinity']
+  
+- name: Start pcsd, pacemaker service in CentOS7
+  service: name={{item}} state=started
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  with_items:
+    - 'pcsd'
+    - 'pacemaker'
+  tags: ['owm-affinity'] 

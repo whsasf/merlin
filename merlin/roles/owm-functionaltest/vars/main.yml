@@ -1,0 +1,71 @@
+---
+jmeter_version: 2.13
+# Variables required for LDAP add, modify, modrdn, & delete tests.
+jmeter_ldap:
+  - ldap_username: root                                # LDAP username
+    ldap_password: secret                              # LDAP password
+    ldap_domain_name: "{{domain_name}}"                # Domain name to get access
+    ldap_user: merlintestuser07@{{domain_name}}        # A test user email id
+    ldap_user_password: merlintestuser07               # Password of the test user
+    ldap_user_attr_name: maillogin                     # LDAP Attribute name required for a test case
+    ldap_user_attr_value: mod2                         # LDAP Attribute value
+    ldap_operation_code: replace                       # LDAP Operation to perform
+    ldap_user_modrdn: merlintestuser08{{domain_name}}  # A test user email id required for a test case
+    ldap_user1: merlintestuser10@{{domain_name}}       # A test user emill id required for test case
+
+# Varibales required for IMAP tests.
+jmeter_imap:
+  - user1_emailId: merlintestuser01@{{domain_name}}
+    user1_username: merlintestuser01
+    user1_password: merlintestuser01
+    user1: merlintestuser01
+    user2_emailId: merlintestuser02@{{domain_name}}
+    user2_password: merlintestuser02
+    user2_username: merlintestuser02
+
+# Variables required for MTA tests.
+jmeter_mta:
+  - from_user_emailId: merlintestuser03@{{domain_name}}
+    from_user_password: merlintestuser03
+    from_username: merlintestuser03
+    to_user_emailId: merlintestuser04@{{domain_name}}
+    to_user_password: merlintestuser04
+    to_username: merlintestuser04	
+
+# Variables required for MSS tests.
+jmeter_mss:
+  - mss_user: merlintestuser05@{{domain_name}}
+
+# Variables required for mOS tests.
+jmeter_mos:
+  - user: merlintestuser06@{{domain_name}}
+    user_password: merlintestuser06
+    user_for_nginx:  merlintestuser09
+    user_for_nginx_password: merlintestuser09
+
+# Varibales required for RG tests.
+jmeter_rg:
+  - from_user_emailId: merlintestuser03@{{domain_name}}
+    from_user_password: merlintestuser03
+    from_username: merlintestuser03
+    to_user_emailId: merlintestuser04@{{domain_name}}
+
+# Varibales required for WebTop tests.
+jmeter_webtop:
+  - from_user_emailId: merlintestuser09@{{domain_name}}
+    from_user_password: merlintestuser09
+    from_username: merlintestuser09
+    to_user_emailId: merlintestuser10@{{domain_name}}
+
+# Set this variable to true only when you want to get 
+# the report
+is_report_required: false
+
+# Variables to send the report of functional tests
+# Provide Server & User information where SMTP server is UP.
+report_server_info:
+  - host: smtp.test.com
+    port: 25
+    from_user: merlintestuser01@{{domain_name}}
+    from_user_password: merlintestuser01
+    to_user: merlintestuser02@{{domain_name}}

@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+{% for scope in limits_scopes %}
+{% for limit in scope.limits %}{{scope.name}} {{limit}}
+{% endfor %}
+{% endfor %}

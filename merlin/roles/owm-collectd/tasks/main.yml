@@ -1,0 +1,59 @@
+---
+- set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: ['owm-collectd']
+  
+- name: Installing Collectd rpm
+  yum: name={{item}} state=latest
+  with_items:
+       - "nc"
+       - "collectd"
+       - "collectd-apache"
+       - "collectd-iptables"
+       - "collectd-snmp"
+  tags: ['owm-collectd']
+
+- name: Get scripts tar
+  get_url: url="{{owm_tar_url}}/scripts.tar" dest="{{emailmx_user[0].home}}"
+  tags: ['owm-collectd']
+
+- name: Untar scripts tar
+  unarchive: src="{{emailmx_user[0].home}}/scripts.tar" dest="{{emailmx_user[0].home}}" copy=no
+  tags: ['owm-collectd']
+  
+- name: Change the ownership of scripts
+  shell: chown -R {{ emailmx_user[0].username }}:{{ emailmx_user[0].username }} {{ emailmx_user[0].home }}/scripts
+  tags: ['owm-collectd']
+
+- name: Change default user home
+  lineinfile:
+    dest: '{{emailmx_user[0].home}}/scripts/mxlogscraper_minute_sender.sh'
+    state: present
+    regexp: '^(.*)\/u0\/imail1(.*)$'
+    line: '\1{{emailmx_user[0].home}}\2'
+    backrefs: yes
+    backup: yes
+  tags: ['owm-collectd']
+  
+- name: Graphite entry in Mxlogscraper SH file
+  shell: sed -i -e "s/172.20.1.107/{{hostvars[groups[node_site+'-monitorui'][0]]['ansible_ssh_host']}}/g" {{emailmx_user[0].home}}/scripts/mxlogscraper_minute_sender.sh
+  tags: ['owm-collectd']
+
+- name: collectd.conf changes 
+  template:
+    src: "collectd.conf.j2"
+    dest: "/etc/collectd.conf"
+    owner: "root"
+    group: "root"
+    mode: 0644
+  tags: ['owm-collectd']
+
+- name: Crontab Job to Push Data to graphite
+  cron: name="Pushing data to graphite" job="su - {{emailmx_user[0].username}} {{emailmx_user[0].home}}/scripts/mxlogscraper_minute_sender.sh"
+  tags: ['owm-collectd']
+
+- name: Collectd Server Start
+  service: name=collectd state=restarted enabled=yes
+  tags: ['owm-collectd']

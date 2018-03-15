@@ -1,0 +1,46 @@
+# {{ ansible_managed }}
+
+define hostgroup {
+  hostgroup_name smtpoutservers 
+  alias Outbound SMTP Servers
+}
+{% if groups['smtpout'] is defined %}
+{% for host in groups['smtpout'] %}
+
+define host {
+  use                     linux-server
+  host_name               {{ host }}
+  alias                   {{ host }}
+  address                 {{ hostvars[host].ansible_ssh_host }}
+  hostgroups              smtpoutservers 
+}
+{% endfor %}
+
+define service {
+  use                     local-service
+  hostgroup_name          smtpoutservers
+  service_description     Mx immgrserv version
+  check_command           get_mx_version!5003!!!!!!!
+}
+
+define service {
+  use                     local-service
+  hostgroup_name          smtpoutservers
+  service_description     Mx imextserv version
+  check_command           get_mx_version!5015!!!!!!!
+}
+
+define service {
+  use                     local-service
+  hostgroup_name          smtpoutservers
+  service_description     Mx mta version
+  check_command           get_mx_version!5018!!!!!!!
+}
+
+define service {
+  use                     local-service
+  hostgroup_name          smtpoutservers
+  service_description     SMTP Access
+  check_command           check_smtp!!!!!!!!
+}
+{% endif %}

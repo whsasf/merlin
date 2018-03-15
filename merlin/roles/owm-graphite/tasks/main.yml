@@ -1,0 +1,115 @@
+---
+
+- name: Installing Graphite rpm
+  yum: name={{item}} state=latest
+  with_items:
+       - "python-whisper"
+       - "python-simplejson*"
+       - "Django"
+       - "dejavu-serif-fonts"
+       - "python-django-tagging"
+       - "dejavu-sans-fonts*"
+       - "pytz*"
+       - "mod_wsgi*"
+       - "pyparsing"
+       - "graphite-web"
+       - "python-twisted-core*"
+       - "python-carbon"
+       - "policycoreutils-python*"
+       - "graphite-web-selinux"
+       - "python-zope-interface"
+       - "chkconfig*"
+       - "initscripts*"
+       - "shadow-utils*"
+       - "mysql"
+       - "mysql-server"
+       - "MySQL-python*"
+       - "xinetd"
+  tags: ['owm-graphite']
+   
+- name: MySQL Start
+  shell: /etc/init.d/mysqld start
+  ignore_errors: false
+  tags: ['owm-graphite']
+
+- name: Configuring Database to use MySQL database
+  lineinfile:
+    dest: /etc/graphite-web/local_settings.py 
+    state: present
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^#DATABASES = {', line: 'DATABASES = {' }
+    - { regexp: "^#    'default': {", line: "    'default': {" }
+    - { regexp: "^#        'NAME': '{{graphite_Install_path}}/graphite/storage/graphite.db',", line: "        'NAME': 'graphite'," }
+    - { regexp: "^#        'ENGINE': 'django.db.backends.sqlite3',", line: "        'ENGINE': 'django.db.backends.mysql'," }
+    - { regexp: "^#        'USER': '',", line: "        'USER': '{{graphite_user}}'," }
+    - { regexp: "^#        'PASSWORD': '',", line: "        'PASSWORD': '{{graphite_password}}'," }
+    - { regexp: "^#        'HOST': '',", line: "        'HOST': '{{graphite_host}}'," }
+    - { regexp: "^#        'PORT': ''", line: "        'PORT': '3306'" }
+    - { regexp: "^#    }", line: "    }" }
+    - { regexp: '^#}', line: '}' }
+  tags: ['owm-graphite']
+
+- name: Graphite MySQL account
+  mysql_user: name={{graphite_user}} password={{graphite_password}} host={{graphite_host}} priv={{item}}
+  with_items:
+    - '{{graphite_user}}.*:ALL,GRANT'
+  tags: ['owm-graphite']
+
+- name: Creating Graphite database
+  mysql_db: 
+    name="{{graphite_database}}"
+    state=present
+  tags: ['owm-graphite']
+
+- name: Flushing privileges
+  command: 'mysql -ne "{{ item }}"'
+  with_items:
+    - FLUSH PRIVILEGES
+  changed_when: False
+  tags: ['owm-graphite']
+
+- name: Conf File changes
+  shell: sed -i -e "s/60:90d/60:365d/g" /etc/carbon/storage-schemas.conf ; sed -i -e "s/60s:1d/60s:395d/g" /etc/carbon/storage-schemas.conf
+  tags: ['owm-graphite']
+  
+- name: find state of graphite db
+  command:  "python /usr/lib/python{{python_version}}/site-packages/graphite/manage.py inspectdb"
+  register: inspectdb
+  tags: ['owm-graphite']
+
+- name: prep graphite db
+  command: "python /usr/lib/python{{python_version}}/site-packages/graphite/manage.py syncdb --noinput"
+  when: inspectdb.stdout.find('account_mygraph') == -1
+  tags: ['owm-graphite']
+
+- name: httpd service start
+  service: name=httpd state=restarted enabled=yes
+  ignore_errors: false
+  tags: ['owm-graphite', 'owm-graphite-restart']
+
+- name: Carbon aggregator service start
+  service: name=carbon-aggregator state=restarted enabled=yes
+  ignore_errors: false
+  tags: ['owm-graphite', 'owm-graphite-restart']
+
+- name: Carbon-cache service start
+  service: name=carbon-cache state=restarted enabled=yes
+  ignore_errors: false
+  tags: ['owm-graphite', 'owm-graphite-restart']
+
+- name: xinetd service start
+  service: name=xinetd state=restarted enabled=yes
+  ignore_errors: false
+  tags: ['owm-graphite', 'owm-graphite-restart']
+
+- name: SqlD Start
+  service: name=mysqld state=restarted enabled=yes
+  ignore_errors: false
+  tags: ['owm-graphite', 'owm-graphite-restart']
+
+- name: htcacheclean
+  service: name=htcacheclean state=restarted enabled=yes
+  ignore_errors: false
+  tags: ['owm-graphite', 'owm-graphite-restart']

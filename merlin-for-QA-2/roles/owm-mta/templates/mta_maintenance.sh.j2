@@ -1,0 +1,8 @@
+#!/bin/bash
+. ${HOME}/.profile
+find {{emailmx_user[0].home}}/spool/errors -mtime +7 -type f -exec rm {} \;
+find {{emailmx_user[0].home}}/spool/errors -mtime +7 -type d -exec rmdir {} \;
+find {{emailmx_user[0].home}}/spool/sidelined -mtime +7 -type f -exec rm {} \;
+find {{emailmx_user[0].home}}/spool/sidelined -mtime +7 -type d -exec rmdir {} \;
+{{emailmx_user[0].home}}/bin/imorphanrm -x -g
+{{emailmx_user[0].home}}/bin/imorphanrm -x

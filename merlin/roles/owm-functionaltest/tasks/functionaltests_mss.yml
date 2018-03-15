@@ -1,0 +1,27 @@
+---
+- name: Create directories for MSS
+  file: path=/opt/merlin/jmeter/{{ item }}/mss state=directory
+  with_items:
+    - "tests"
+    - "reports"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mss' ]
+
+- name: Put test cases for MSS
+  template: src=mss/{{ item.test_case }}.j2 dest=/opt/merlin/jmeter/tests/mss/{{ item.test_case }}
+  with_items:
+    - { test_case: 'Test_Imboxmaint_single_user.jmx' }
+    - { test_case: 'Test_Imboxmaint_all_user.jmx' }
+    - { test_case: 'Test_mss_failover.jmx' }
+    - { test_case: 'Test_mss_fallback_one_node.jmx' }
+    - { test_case: 'Test_mss_fallback_all_nodes.jmx' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mss' ]
+
+- name: Execute JMeter test cases for MSS
+  shell: /opt/merlin/jmeter/apache-jmeter-{{jmeter_version}}/bin/jmeter -n -t /opt/merlin/jmeter/tests/mss/{{ item.test }} -l /opt/merlin/jmeter/reports/mss/{{ item.report }}
+  with_items:
+    - { test: 'Test_Imboxmaint_single_user.jmx', report: 'Report_Imboxmaint_single_user.jtl' }
+    - { test: 'Test_Imboxmaint_all_user.jmx', report: 'Report_Imboxmaint_all_user.jtl' }
+    - { test: 'Test_mss_failover.jmx', report: 'Report_mss_failover.jtl' }
+    - { test: 'Test_mss_fallback_one_node.jmx', report: 'Report_mss_fallback_one_node.jtl' }
+    - { test: 'Test_mss_fallback_all_nodes.jmx', report: 'Report_mss_fallback_all_nodes.jtl' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mss' ]

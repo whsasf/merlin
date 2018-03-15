@@ -1,0 +1,13 @@
+---
+# file: security-nessus-client/vars/main.yml.
+# It contains all the variables required by nessus
+# Initilize time required to initilize Nessus Server to accept requests
+# It should be more then 20 minutes
+initilize_time: 20
+# Report format can be 'csv' or 'html'
+nessus_report_format: csv
+nessus_report_download_location: /opt/merlin/nessus
+scan_name: owmScan
+scan_description: SetupScan
+# Need to wait for scan to finish in minutes
+scan_completion_time: 180

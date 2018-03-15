@@ -1,0 +1,34 @@
+#! /bin/bash
+# Add default queues to the queue-service Cassandra Backend
+
+{% if groups[node_site + '-qadmin'] is defined %}{% 
+	for host in groups[node_site + '-qadmin'] %}{% 
+		if loop.first and host == inventory_hostname %}
+
+CHECK=true
+while $CHECK; do
+
+    ST=__$(curl -L http://{{host}}:{{queue_admin_port}}|grep timestamp)
+    
+    if [ "__" != "$ST" ]; then
+        CHECK=false;
+        
+curl -H "Content-Type: application/json" -X POST HTTP://{{host}}:{{queue_admin_port}}/jsonrpc2 -d '{"jsonrpc": "2.0","id": 201,"method": "QueueAdmin.create","params":{"name": "mta_deferred","type": "deferred"}}'
+
+curl -H "Content-Type: application/json" -X POST HTTP://{{host}}:{{queue_admin_port}}/jsonrpc2 -d '{"jsonrpc": "2.0","id": 202,"method": "QueueAdmin.create","params":{"name": "mta_ndn","type": "ndn"}}'
+
+curl -H "Content-Type: application/json" -X POST HTTP://{{host}}:{{queue_admin_port}}/jsonrpc2 -d '{"jsonrpc": "2.0","id": 203,"method": "QueueAdmin.create","params":{"name": "mta_error","type": "error"}}'
+
+curl -H "Content-Type: application/json" -X POST HTTP://{{host}}:{{queue_admin_port}}/jsonrpc2 -d '{"jsonrpc": "2.0","id": 204,"method": "QueueAdmin.create","params":{"name": "mta_sideline","type": "sideline"}}'
+
+    else
+        echo "Waiting for Queue Admin Service ($ST)..."
+        sleep 5
+    fi
+    
+done;
+
+{% 		endif %}{% 
+	endfor %}{% 
+endif %}
+

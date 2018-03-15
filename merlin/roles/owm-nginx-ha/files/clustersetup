@@ -1,0 +1,9 @@
+#!/bin/bash
+user=hacluster
+pass=hacluster
+(
+sleep 2
+echo $user
+sleep 2
+echo $pass
+) | pcs cluster setup --force --name affinityMgr $1 $2 $3

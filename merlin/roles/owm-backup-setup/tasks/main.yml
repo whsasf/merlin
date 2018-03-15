@@ -1,0 +1,26 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-backup-setup', 'setup' ]
+
+- name: Create backup directory on backup server
+  file: path={{backup_server_path}} state=directory mode=0755
+  when: inventory_hostname in groups['{{ node_site }}-backupserver']
+  tags: [ 'owm-backup-setup', 'setup' ]
+
+- name: Setup authorized_keys
+  authorized_key: user=root key="{{item}}"
+  with_file: "~/.ssh/id_rsa.pub"
+  when: inventory_hostname in groups['{{ node_site }}-backupserver']
+  tags: [ 'owm-backup-setup', 'setup' ]
+
+- include: mx_backup_setup.yml
+  when: inventory_hostname in groups['{{ node_site }}-directory'] or inventory_hostname in groups['{{ node_site }}-queue'] 
+  tags: [ 'owm-backup-setup','mx' ]
+
+- include: cassandra_backup_setup.yml
+  when: inventory_hostname in groups['cassmeta'] or inventory_hostname in groups['cassblob']
+  tags: [ 'owm-backup-setup','cassandra' ]

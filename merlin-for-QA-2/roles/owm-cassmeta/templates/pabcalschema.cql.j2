@@ -1,0 +1,705 @@
+// Keyspace for Pab and Cal 
+// Schema version v21
+
+
+
+CREATE KEYSPACE IF NOT EXISTS PAB
+  WITH REPLICATION = { 
+     'class' : 'NetworkTopologyStrategy',
+{% set comma = joiner(",") %}
+{% for site in sites -%}
+      {{ comma() }}'{{site}}' : '{{metareplicationfactor}}'
+{%- endfor %}
+    }
+  AND DURABLE_WRITES = true;
+
+/* Create new empty keyspace with default settings (no replication). */
+
+/*  ***  IMPORTANT ***
+ Replace the <DC x> and <number of replicas> by the appropriate data centers and number of replicas
+ Example for a single node:
+*/
+
+/* Single Node testing only */
+/*
+CREATE KEYSPACE IF NOT EXISTS PAB
+   WITH REPLICATION = {
+        'class' : 'NetworkTopologyStrategy',
+{% for site in sites %}
+      '{{site}}' : 1
+{% endfor %}
+    }
+  AND DURABLE_WRITES = true;
+*/
+
+/* Use keyspace */
+
+USE PAB;
+
+
+
+// PAB/OWM configuration table. This table possibly moves to a
+// configuration keyspace if we plan to have a one-stop-shop for cass stubs.
+// Used for tracking schema versions, updates, etc.
+
+CREATE TABLE IF NOT EXISTS OWM_Config
+(
+    service     text,       // Short name of this service. Part of primary key.
+    component   text,       // sub category, component, folder. Part of PK.
+    server      text,       // Server. May be wildcard or blank. Part of PK.
+    key         text,       // Clustering key.
+    value       text,       // Configuration value.
+    PRIMARY KEY ((service, component, server), key)
+)
+WITH CLUSTERING ORDER BY (key ASC );
+
+INSERT INTO OWM_Config (service, component, server, key, value) VALUES ('PAB', 'Schema', '', 'Version', '1.0.1');
+
+
+// Address book index, used on address book creation and deletion
+// to garantee uniqueness of address book identifier
+
+CREATE TABLE IF NOT EXISTS AddressBookIndex
+(
+    userId ascii,               // mX mailboxid (?)
+    addressbook varchar,        // Address book / safety list identifier (ex: 'main', or 'sfty-main')
+    abId timeuuid,              // Address book / safety list UID, key to access other tables
+    PRIMARY KEY (userId, addressbook)
+);
+
+
+// Actual address books
+
+CREATE TABLE IF NOT EXISTS AddressBooks
+(
+    userId ascii,               // User mX mailboxid (?)
+    addressbook varchar,        // Address book / safety list identifier (ex: 'main', or 'sfty-main')
+    abId timeuuid,              // Address book / safety list UID, key to access other tables
+    displayName varchar,        // Address book display name
+    cTag timeuuid,              // Address book collection tag
+    acl set<varchar>,           // Access control entries
+    delTime timestamp,          // Deletion timestamp date
+    properties map<varchar, varchar>,   // AB properties
+    PRIMARY KEY (userId, addressbook, abId)
+);
+
+// ACL values are made of <ace type>:[user sid]:[domain sid]:<access>
+//     ace type can be user, dom, grp, all
+//     access can be 0: user, 1: domain, 2, group, 3: all, 4: none
+
+
+// Mounted address books, e.g. address books user has subscribed to
+// Depending how mounted address book list is dealt with in PAB, this table could be merged in AddressBooks table
+
+CREATE TABLE IF NOT EXISTS MountedAddressBooks
+(
+    userId ascii,               // User mX mailboxid
+    addressbook varchar,        // Address book identifier, ex: 'main'
+    ownerId ascii,              // Owner mX mailboxid
+    displayName varchar,        // Address book display name
+    access int,                 // Access 0 (read only), 1 (read write), 2 (none), other (invalid)
+    PRIMARY KEY (userId, addressbook)
+);
+
+
+// Address book counters
+// Cassandra requires a separate table with counters only
+
+CREATE TABLE ABCounters
+(
+    abId timeuuid,                      // Address book UID
+    actContacts counter,                // Number of active contacts in the address book
+    actGroups counter,                  // Number of active groups in the address book
+    actAggregated counter,              // Number of active aggregated contacts in the address book
+    delContacts counter,                // Number of deleted contacts in the address book
+    delGroups counter,                  // Number of deleted groups in the address book
+    delAggregated counter,              // Number of deleted aggregated contacts in the address book
+    PRIMARY KEY (abId)
+);
+
+
+CREATE TABLE IF NOT EXISTS Entries
+(
+    abId timeuuid,                      // Address book UID
+    entryType int,                      // Entry type: 1(contact), 2(group), 4(agg contact)
+    entryId varchar,                    // Entry id, key to other tables
+    entryTag timeuuid,                  // Entry tag, key to other tables
+    trashTime timestamp,                // Trash time
+    restoreTime timestamp,              // Restore time
+    delTime timestamp,                  // Deletion timestamp date
+    PRIMARY KEY (abId, entryType, entryId)
+);
+
+// Not sure entryId is required in key. It could be static instead
+
+CREATE TABLE IF NOT EXISTS EntryAttributes
+(
+    abId timeuuid,              // Address book UID
+    entryId varchar,            // Entry id, key to other tables
+    entryTag timeuuid,          // Entry tag, key to other tables
+    name varchar,               // Normalized (lowercase) attribute name
+    value varchar,              // Attribute value
+    type int,                   // Attribute type
+    parameters map<ascii, varchar>, // Value parameters (ALTID, PIDs, LANG, SORT-AS, PREF, MEDIATYPE, TZ, VALUE...)
+    PRIMARY KEY (abId, entryId, entryTag, name, value)
+);
+
+// type is made of MSB(secondary type) | LSB(primary type)
+// primary type:  0(string), 1(binary), 2(custom)
+// secondary type: 0(value is inline), 1(value is valueId ref Values table), 2 (value is a URL to some external ref)
+
+
+// Potential issue in this table is that all attributes + their values in an AB will be on the
+// same node (as partition key is abId only)
+CREATE TABLE IF NOT EXISTS AddressbookAttributes
+(
+    abId timeuuid,              // Address book UID
+    name varchar,               // Normalized (lowercase) attribute name
+    entryId varchar,            // Entry id
+    entryTag timeuuid,          // Entry etag
+    entryType int,              // Entry type: 1(contact), 2(group), 4(agg contact)
+    value varchar,              // Attribute value
+    type int,                   // Attribute type
+    parameters map<ascii, varchar>, // Value parameters (ALTID, PIDs, LANG, SORT-AS, PREF, MEDIATYPE, TZ, VALUE...)
+    PRIMARY KEY (abId, name, entryId, entryTag, value)
+);
+
+// Large values like photo
+CREATE TABLE IF NOT EXISTS AttributeValues
+(
+    valueId timeuuid,           // Value UID
+    value varchar,              // Attribute value
+    PRIMARY KEY (valueId)
+);
+
+// Potential issue in this table is that all entries in an AB will be on the
+// same node (as partition key is abId only)
+CREATE TABLE IF NOT EXISTS ChildToParents
+(
+    abId timeuuid,              // Address book UID
+    childId varchar,            // Child entry id
+    parentId varchar,           // Parent entry id
+    parentTag timeuuid,         // Parent entry tag
+    link int,                   // Link type: 0 (group to contact), 1 (group to group), 2 (group to aggregated), 3 (aggregated to contact), ...
+    PRIMARY KEY(abId, childId, parentId, parentTag)
+);
+
+CREATE TABLE IF NOT EXISTS SafetyListEntries (
+    userId varchar,         // User id (mX mailboxid)
+    listId timeuuid,        // List UUID
+    listType int,           // List type: 1 (full_allow), 2(fully_block), 3 (partial_allow), 4 (partial block)
+    key varchar,            // Email address or contact/group URL
+    sftyType varchar,       // Safety type: MAIL or CONTACT+tag+abid+id or GROUP+tag+abid+id
+    friendlyName varchar,   // Friendly name
+    records set<varchar>,   // Msg ids
+    PRIMARY KEY ((userId, listId), key, listType, sftyType)
+);
+
+
+// This table contains the house-keeping status of the instance
+// e.g. the last user the instance processed.
+// This table is used when instance needs to resume house-keeping,
+// and is regularly updated by the server instance
+CREATE TABLE MaintenanceStatus
+(
+    instance varchar,       // Server instance (ped name)
+    site varchar,           // Last server site
+    bucket int,             // Last bucket being processed
+    userId ascii,           // Id (mX mailboxid) of last user processed
+    last timestamp,         // Time stamp of last maintenance
+    PRIMARY KEY(instance)
+);
+
+
+// Maintenance status per user, e.g. when maintenance was run last for each user
+// New entries in this table are added on address book creation (users don't show up in this table
+// until at least an address book is created for them)
+CREATE TABLE MaintenanceUsers
+(
+    site varchar,           // Site name
+    bucket int,             // Bucket id
+    userId ascii,           // Id (mX mailboxid) of last user processed
+    last timestamp,         // time stamp of last maintenance
+    PRIMARY KEY((site, bucket), userId)
+);
+
+
+/* Create new empty keyspace with default settings (no replication). */
+
+/*  ***  IMPORTANT ***
+ Replace the <DC x> and <number of replicas> by the appropriate data centers and number of replicas
+ Example for a single node:
+*/
+
+/* Single Node testing only */
+/*
+CREATE KEYSPACE IF NOT EXISTS CAL
+    WITH REPLICATION = {
+        'class' : 'NetworkTopologyStrategy',
+{% for site in sites %}
+        '{{site}}' : 1
+{% endfor %}
+    }
+  AND DURABLE_WRITES = true;
+*/
+
+
+CREATE KEYSPACE IF NOT EXISTS CAL
+    WITH REPLICATION = {
+        'class' : 'NetworkTopologyStrategy',
+{% set comma = joiner(",") %}
+{% for site in sites %}
+      {{ comma() }}'{{site}}' : '{{metareplicationfactor}}'
+{%- endfor %}
+    }
+  AND DURABLE_WRITES = true;
+
+/* Use keyspace */
+
+USE CAL;
+
+
+
+// CAL/OWM configuration table. This table possibly moves to a
+// configuration keyspace if we plan to have a one-stop-shop for cass stubs.
+// Used for tracking schema versions, updates, etc.
+CREATE TABLE IF NOT EXISTS OWM_Config
+(
+    service     text,       // Short name of this service. Part of primary key.
+    component   text,       // sub category, component, folder. Part of PK.
+    server      text,       // Server. May be wildcard or blank. Part of PK.
+    key         text,       // Clustering key.
+    value       text,       // Configuration value.
+    PRIMARY KEY ((service, component, server), key)
+)
+WITH CLUSTERING ORDER BY (key ASC );
+
+INSERT INTO OWM_Config (service, component, server, key, value) VALUES ('CAL', 'Schema', '', 'Version', '1.0.0');
+
+
+
+/* Calendar table defining the calendars owned by each user.
+ *
+ * Note the use of an internal private ID (i.e. "calId") for each calendar. This is used to associate each event/task
+ * with their parent calendar. Using a private ID (instead of "relcalid") guarantees the correct behaviour if a user
+ * deletes a calendar and re-adds one with the same relcalid.
+ *
+ * Add a new calendar:
+ *     INSERT INTO Calendars (userId, relcalid, calId, displayName, cTag, creationTime)
+ *         VALUES ('65e1917c-583e-0001-b435-f5d324a26f47', '65e1917c-583e-0001-b435-f5d324a26f47-main',
+ *                 82e0fbe0-ce47-11e4-8b66-8919726f2a47, 'Main Calendar', now(), dateOf(now()))
+ *         IF NOT EXISTS;
+ *     - This requires CAS to guarantee that only one calendar with the specified "relcalid" can exist.
+ *
+ * List all calendars for a particular user:
+ *     SELECT relcalid, calId, cTag FROM Calendars
+ *         WHERE userId = '65e1917c-583e-0001-b435-f5d324a26f47';
+ *
+ * Read the metadata for a particular calendar:
+ *     SELECT * FROM Calendars
+ *         WHERE userId = '65e1917c-583e-0001-b435-f5d324a26f47'
+ *           AND relcalid = '65e1917c-583e-0001-b435-f5d324a26f47-main';
+ *
+ * Update a particular calendar:
+ *     UPDATE Calendars
+ *         SET displayName = 'My Calendar', properties['color'] = '5', cTag = now(), lastModTime = dateOf(now())
+ *         WHERE userId = '65e1917c-583e-0001-b435-f5d324a26f47'
+ *           AND relcalid = '65e1917c-583e-0001-b435-f5d324a26f47-main'
+ *         IF calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47;
+ *     - This requires CAS to prevent the calendar from being re-added if the specified one no longer exists (because
+ *       it was just deleted for example).
+ *
+ *
+ * Delete a particular calendar:
+ *     DELETE FROM Calendars
+ *         WHERE userId = '65e1917c-583e-0001-b435-f5d324a26f47'
+ *           AND relcalid = '65e1917c-583e-0001-b435-f5d324a26f47-main';
+ *     - Any associated events/todos/timezones will need to be deleted separately. This will be done immediately after
+ *       the above delete completes successfully.
+ */
+CREATE TABLE IF NOT EXISTS Calendars
+(
+    userId ascii,                   // the SID of the user who owns the calendar (e.g. "65e1917c-583e-0001-b435-f5d324a26f47").
+    relcalid text,                  // the globally unique public ID of the calendar (e.g. "65e1917c-583e-0001-b435-f5d324a26f47-main").
+    calId timeuuid,                 // the globally unique internal ID of the calendar.
+    displayName text,               // the calendar display name (e.g. "My Default Calendar").
+    description text,               // the description of the calendar.
+    defaultTzid text,               // the ID of the default timezone to use for this calendar (e.g. "Europe/London").
+    properties map<text,text>,      // any additional arbitrary calendar properties (e.g. "color" => "5").
+    acl set<text>,                  // the collection of access control entries.
+    cTag timeuuid,                  // the collection tag, which is updated every time the calendar is modified.
+    creationTime timestamp,         // the time when the calendar was created.
+    lastModTime timestamp,          // the time when the calendar was last modified.
+    PRIMARY KEY (userId, relcalid)
+);
+
+
+/* Table defining the timezones in use by a particular calendar.
+ *
+ * Each event or todo in the calendar can reference zero or more timezones (usually a small set of different ones within
+ * a calendar). Rather than duplicating the timezone definition in each event or todo, they are stored in this table. It
+ * can happen that different events/todos use a different definition of the same timezone. In this case we only store
+ * the most recent definition of the timezone, based on the date of the most recent standard/daylight definitions.
+ *
+ * Add a new timezone:
+ *     INSERT INTO CalendarTimezones (calId, tzid, timezone, maxdate)
+ *         VALUES (82e0fbe0-ce47-11e4-8b66-8919726f2a47, 'Europe/London', textAsBlob('<VTIMEZONE>'), 26272800)
+ *         IF NOT EXISTS;
+ *
+ * Update a timezone:
+ *     UPDATE CalendarTimezones
+ *         SET timezone = textAsBlob('<VTIMEZONE>'), maxdate = 26272800
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND tzid = 'Europe/London'
+ *         IF maxdate < 26272800;
+ *
+ * Select some timezones (those used by an event for example):
+ *     SELECT timezone FROM CalendarTimezones
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND tzid IN ('Europe/London', 'US/Eastern');
+ *
+ * Select all timezones in a calendar:
+ *     SELECT timezone FROM CalendarTimezones
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47;
+ *
+ * Delete all timezones used by calendar:
+ *     DELETE FROM CalendarTimezones
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47;
+ */
+CREATE TABLE IF NOT EXISTS CalendarTimezones
+(
+    calId timeuuid,                 // the private ID of the calendar that the timezone belongs to (see "Calendars.calId").
+    tzid text,                      // the timezone identifier (i.e. the value of the "TZID" iCal property).
+    timezone blob,                  // the timezone itself, encoded as an iCal VTIMEZONE.
+    maxdate timestamp,              // the date of the most recent standard/daylight definition in the timezone. This is
+                                    //   used to detect the most recent version of a timezone definition.
+    PRIMARY KEY (calId, tzid)
+);
+
+
+/* Table storing calendar counters to support quota implementation
+ *
+ * Un-like PAB, currently CAL does not support a Trash limit, so counters include
+ * both active and deleted entries.
+ *
+ * When adding a new event:
+ *
+ *     UPDATE CalendarCounters
+ *         SET events = events + 1
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47 ;
+ *
+ * When adding a new todo:
+ *     UPDATE CalendarCounters
+ *         SET todos = todos + 1
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47 ;
+ *
+ * When deleting an event:
+ *
+ *     UPDATE CalendarCounters
+ *         SET events = events - 1
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47 ;
+ *
+ * When deleting a todo:
+ *     UPDATE CalendarCounters
+ *         SET todos = todos - 1
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47 ;
+ *
+ * Delete calendar coutners:
+ *     DELETE FROM CalendarCounters
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47;
+ */
+CREATE TABLE IF NOT EXISTS CalendarCounters
+(
+    calId timeuuid,                     // the private ID of the calendar
+    events counter,                     // Number of events in the calendar
+    todos counter,                      // Number of tasks in the calendar
+    PRIMARY KEY (calId)
+);
+
+/* TDB Modify this table primary key to make uid the partition key, meaning this table won't be used anymore to
+ * read all entries.
+ * Instead add a new table with (calid, uid, etag) only, used to list entries and to fulfill CalDAV sync PROPFIND all etags
+ */
+
+/* Events table containing the events in each calendar.
+ *
+ * All operations on this table assume the private calendar ID (see "Calendars.calId") has already been determined by
+ * looking up the "Calendars" table.
+ *
+ * Updates to this table are also likely to require updates to the "EventsByMonth", "EventsByAliasId" and "Reminders"
+ * tables. Also, any updates will require a change to the CTag of the associated calendar (see "Calendar.cTag").
+ *
+ * Add a new event:
+ *     INSERT INTO Events (calId, uid, aliasId, vcomponents, eTag, creationTime)
+ *         VALUES (82e0fbe0-ce47-11e4-8b66-8919726f2a47, '67fe3471-3457-11e4-da34-0987322feb34@webtop.com', "event_1",
+ *                 textAsBlob('<iCal VEVENT>'), 14b8b8d0-cf49-11e4-8721-8919726f2a47, dateOf(now()))
+ *         IF NOT EXISTS;
+ *     - This requires CAS to guarantee that only one event with the specified UID can exist.
+ *     - Associated entries will also need to be added to the "EventsByMonth", "EventsByAliasId" and "Reminders" tables.
+ *     - The VEVENT blob may actually contain multiple VEVENTs (in the case of a recurring event with exceptions).
+ *
+ * List all events in a particular calendar:
+ *     SELECT uid, aliasId, eTag, trashTime FROM Events
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47;
+ *     - This will also return trashed events, which can then be manually filtered if required.
+ *
+ * Read a particular event:
+ *     SELECT * FROM Events
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND uid = '67fe3471-3457-11e4-da34-0987322feb34@webtop.com';
+ *
+ * Read multiple identified events:
+ *     SELECT vcomponents, uid, aliasId, eTag, trashTime FROM Events
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND uid IN ('67fe3471-3457-11e4-da34-0987322feb34@webtop.com', '566778de-72ab-11e4-de11-5469cf341782@webtop.com');
+ *     - The "properties" collection can't be returned when using the "IN" clause (Cassandra limitation).
+ *
+ * Update a particular event:
+ *     UPDATE Events
+ *         SET vcomponents = textAsBlob('<iCal VEVENT>'), properties['all-day'] = 'false', eTag = now(), lastModTime = dateOf(now())
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND uid = '67fe3471-3457-11e4-da34-0987322feb34@webtop.com'
+ *         IF eTag = 14b8b8d0-cf49-11e4-8721-8919726f2a47;
+ *     - This requires CAS to guarantee that the event will only be updated if the specified eTag matches (required if
+ *       the CalDAV client specified the "If-Match: <eTag>" header).
+ *     - Entries associated with the previous version of the event must also be deleted immediately from the
+ *       "EventsByMonth" table, but any stale reminders in the "Reminders" table will not be deleted until they
+ *       are due. Any required new entries will also be added to both tables.
+ *
+ * Move a particular event to the trash:
+ *     UPDATE Events
+ *         SET trashTime = dateOf(now())
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND uid = '67fe3471-3457-11e4-da34-0987322feb34@webtop.com';
+ *     - Any associated entries in the "EventsByMonth", "EventsByAliasId" and "Reminders" tables will not be altered.
+ *
+ * Restore a particular event from the trash:
+ *     UPDATE Events
+ *         SET trashTime = null
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND uid = '67fe3471-3457-11e4-da34-0987322feb34@webtop.com';
+ *
+ * Delete a particular event:
+ *     DELETE FROM Events
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND uid = '67fe3471-3457-11e4-da34-0987322feb34@webtop.com';
+ *     - Any associated entries in the "EventsByMonth" and "EventsByAliasId" table will also be deleted immediately,
+ *       while any associated reminders in the "Reminders" table will not be deleted until the reminder is due.
+ *
+ * Delete all events for a particular calendar (to clean-up the table when deleting a calendar):
+ *     DELETE FROM Events
+ *         USING TIMESTAMP <Now + 1 hour>
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47;
+ *     - The "USING TIMESTAMP" clause causes the delete to happen immediately, but be recorded 1 hour into the future.
+ *       This will cause any mutations on that calendar (like the addition of new events that might be happening
+ *       concurrently with the delete of the calendar) to effectively be ignored for the next hour.
+ *     - Any associated entries in the "EventsByMonth" and "EventsByAliasId" tables will also be deleted immediately,
+ *       while any associated reminders in the "Reminders" table will not be deleted until the reminder is due.
+ */
+CREATE TABLE IF NOT EXISTS Events
+(
+    calId timeuuid,                 // the private ID of the calendar that the event belongs to (see "Calendars.calId").
+    uid text,                       // the UID of the event (i.e. the value of the "UID" iCal property).
+    aliasId text,                   // an alternative ID of the event (which may or may not be the same as the "UID"
+                                    //   property).
+    vcomponents blob,               // the event itself encoded as an iCal VCALENDAR with one or more VEVENT child
+                                    //   components. Multiple VEVENT components will only be present if the event is a
+                                    //   recurring event with some exceptions. Any timezones referenced by the event
+                                    //   will be stored in the "CalendarTimezones" table (to avoid duplication).
+    properties map<text,text>,      // any additional arbitrary event properties.
+    trashTime timestamp,            // the time when the event was moved to Trash, or null otherwise.
+    eTag timeuuid,                  // the entity tag, which is updated every time the event is modified.
+    creationTime timestamp,         // the time when the event was created.
+    lastModTime timestamp,          // the time when the event was last modified.
+    tzids blob,                     // '\0' separated list of timezone IDs referenced by the event (see the iCAL "TZID"
+                                    //   parameter).
+    PRIMARY KEY (calId, uid)
+);
+
+/* Events in each calendar indexed by month.
+ *
+ * This is used to quickly identify the events in a particular calendar that occur within a particular time range,
+ * without having to explicitly read and parse every event in the calendar.
+ *
+ * An entry is added to this table for each month the event occurs in. If an event recurs infinitely, a single entry is
+ * added with a special "yyyymm" value of 0.
+ *
+ * Any entries identified by a lookup on this table may already be deleted, moved to the trash (see "Event.trashTime")
+ * or have been updated (i.e. "EventsByMonth.eTag" != "Event.eTag"). Also, any identified recurring events might have
+ * exceptions. Therefore, further processing of any identified events will be necessary. Any stale indices will be
+ * deleted as they are found.
+ *
+ * Add index for an event that occurs in March 2015:
+ *     INSERT INTO EventsByMonth (calId, yyyymm, uid, eTag)
+ *         VALUES (82e0fbe0-ce47-11e4-8b66-8919726f2a47, 201503, '67fe3471-3457-11e4-da34-0987322feb34@webtop.com',
+ *                 14b8b8d0-cf49-11e4-8721-8919726f2a47);
+ *
+ * Add indices for a recurring event that reccurs during March and April 2015:
+ *     INSERT INTO EventsByMonth (calId, yyyymm, uid, eTag)
+ *         VALUES (82e0fbe0-ce47-11e4-8b66-8919726f2a47, 201503, '56fae591-1a67-45de-2790-43e5a256d127@webtop.com',
+ *                 93cf8310-cf49-11e4-8721-8919726f2a47);
+ *     INSERT INTO EventsByMonth (calId, yyyymm, uid, eTag)
+ *         VALUES (82e0fbe0-ce47-11e4-8b66-8919726f2a47, 201504, '56fae591-1a67-45de-2790-43e5a256d127@webtop.com',
+ *                 93cf8310-cf49-11e4-8721-8919726f2a47);
+ *
+ * Add index for a recurring event that reccurs infinitely (i.e. no end date):
+ *     INSERT INTO EventsByMonth (calId, yyyymm, uid, eTag)
+ *         VALUES (82e0fbe0-ce47-11e4-8b66-8919726f2a47, 0, '41da36a1-96a1-3d70-16b2-1ab3e2719afe@webtop.com',
+ *                 173579d0-cf63-11e4-8721-8919726f2a47);
+ *
+ * List all infinitely recurring events:
+ *     SELECT uid, eTag FROM EventsByMonth
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND yyyymm = 0;
+ *     - When performing any lookup, this query will also have to be executed to identify any infinitely recurring
+ *       events. These must then be expanded to determine if they recur during the requested time period.
+ *
+ * List all events that occur on 10th March 2015:
+ *     SELECT uid, eTag FROM EventsByMonth
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND yyyymm = 201503;
+ *     - As the index has only a granularity of a month, each returned event will need to be processed further to
+ *       identify those that occur on the requested day.
+ *
+ * List all events that occur in March 2015:
+ *     SELECT uid, eTag FROM EventsByMonth
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND yyyymm = 201503;
+ *
+ * List all events that occur in 2015:
+ *     SELECT uid, eTag FROM EventsByMonth
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND yyyymm >= 201501
+ *           AND yyyymm <= 201512;
+ *
+ * Delete all indices for a particular event:
+ *     DELETE FROM EventsByMonth
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND yyyymm = 201503
+ *           AND uid = '56fae591-1a67-45de-2790-43e5a256d127@webtop.com';
+ *     DELETE FROM EventsByMonth
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND yyyymm = 201504
+ *           AND uid = '56fae591-1a67-45de-2790-43e5a256d127@webtop.com';
+ *     - Unfortunately, we are required to first expand the event to identify the months the event occurs in, and then
+ *       issue a query to delete the index for each month.
+ *
+ * Delete the index for a particular infinitely recurring event:
+ *     DELETE FROM EventsByMonth
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND yyyymm = 0
+ *           AND uid = '41da36a1-96a1-3d70-16b2-1ab3e2719afe@webtop.com';
+ *
+ * Delete all indices used by a particular calendar (to clean-up the index when deleting a calendar):
+ *     DELETE FROM EventsByMonth
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47;
+ */
+CREATE TABLE IF NOT EXISTS EventsByMonth
+(
+    calId timeuuid,                 // the private ID of the calendar containing the referenced event (see "Calendars.calId").
+    yyyymm int,                     // the year/month the referenced event occurs in (e.g. 201503 for March 2015).
+    uid text,                       // the UID of the referenced event.
+    eTag timeuuid,                  // the entity tag identifying the version of the referenced event (used to determine
+                                    //   if the index is stale).
+    PRIMARY KEY (calId, yyyymm, uid, eTag)
+);
+
+
+/* Events in each calendar indexed by their alias ID.
+ *
+ * This is used to quickly identify the event in a particular calendar with a particular alias ID (as distinct from
+ * the event UID). This table simply maps the alias ID to the UID, which can then be used to find the event in the
+ * "Events" table.
+ *
+ * Add an alias ID for an event:
+ *     INSERT INTO EventsByAliasId (calId, aliasId, uid)
+ *         VALUES (82e0fbe0-ce47-11e4-8b66-8919726f2a47, 'event_1', '67fe3471-3457-11e4-da34-0987322feb34@webtop.com')
+ *         IF NOT EXISTS;
+ *     - This requires CAS to guarantee that only one event with the specified alias ID can exist.
+ *
+ * Find the UID associated with a particular alias ID:
+ *     SELECT uid FROM EventsByAliasId
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND aliasId = 'event_1';
+ *
+ * Delete a particular alias ID:
+ *     DELETE FROM EventsByAliasId
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47
+ *           AND aliasId = 'event_1';
+ *
+ * Delete all indices used by a particular calendar (to clean-up the index when deleting a calendar):
+ *     DELETE FROM EventsByAliasId
+ *         WHERE calId = 82e0fbe0-ce47-11e4-8b66-8919726f2a47;
+ */
+CREATE TABLE IF NOT EXISTS EventsByAliasId
+(
+    calId timeuuid,                 // the private ID of the calendar containing the referenced event (see "Calendars.calId").
+    aliasId text,                   // an alternative ID of the event (which may or may not be the same as the "UID" property).
+    uid text,                       // the UID of the referenced event.
+    PRIMARY KEY (calId, aliasId)
+);
+
+
+
+/* Todos table containing the todos in each calendar.
+ *
+ * Similar to the "Events" table above.
+ */
+CREATE TABLE IF NOT EXISTS Todos
+(
+    calId timeuuid,                 // the private ID of the calendar that the todo belongs to (see "Calendars.calId").
+    uid text,                       // the UID of the todo (i.e. the value of the "UID" iCal property).
+    aliasId text,                   // an alternative ID of the todo (which may or may not be the same as the "UID"
+                                    //   property).
+    vcomponents blob,               // the todo itself encoded as an iCal VCALENDAR with one or more VTODO child
+                                    //   components. Multiple VTODO components will only be present if the todo is a
+                                    //   recurring todo with some exceptions. Any timezones referenced by the todo
+                                    //   will be stored in the "CalendarTimezones" table (to avoid duplication).
+    properties map<text,text>,      // any additional arbitrary todo properties.
+    trashTime timestamp,            // the time when the todo was moved to Trash, or null otherwise.
+    eTag timeuuid,                  // the entity tag, which is updated every time the todo is modified.
+    creationTime timestamp,         // the time when the todo was created.
+    lastModTime timestamp,          // the time when the todo was last modified.
+    tzids blob,                     // '\0' separated list of timezone IDs referenced by the todo (see the iCAL "TZID"
+                                    //   parameter).
+    PRIMARY KEY (calId, uid)
+);
+
+
+/* Todos in each calendar indexed by month.
+ *
+ * Similar to the "EventsByMonth" table above.
+ */
+CREATE TABLE IF NOT EXISTS TodosByMonth
+(
+    calId timeuuid,                 // the private ID of the calendar containing the referenced todo (see "Calendars.calId").
+    yyyymm int,                     // the year/month the referenced todo occurs in (e.g. 201503 for March 2015).
+    uid text,                       // the UID of the referenced todo.
+    eTag timeuuid,                  // the entity tag identifying the version of the referenced todo (used to determine
+                                    //   if the index is stale).
+    PRIMARY KEY (calId, yyyymm, uid, eTag)
+);
+
+
+/* Todos in each calendar indexed by their alias ID.
+ *
+ * Similar to the "EventsByMonth" table above.
+ */
+CREATE TABLE IF NOT EXISTS TodosByAliasId
+(
+    calId timeuuid,                 // the private ID of the calendar containing the referenced todo (see "Calendars.calId").
+    aliasId text,                   // an alternative ID of the todo (which may or may not be the same as the "UID" property).
+    uid text,                       // the UID of the referenced todo.
+    PRIMARY KEY (calId, aliasId)
+);
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,52 @@
+#
+#  password is encrypted string of "owm" in /etc/shadow
+#
+eureka_user:
+  - username: owm
+    password: $6$zxiaXucE$w63HLxeD9psAsW6cERr4VOdVKFKmMpcbs6jSFkkQ7yx5H8VpYURml4uM4lJ.VAOpGpTo32SO3g53oV8HI3TUx.
+    name: Eureka user account
+    home: /opt/owm
+    groups: []
+    uid: 5501
+    ssh_key: []
+
+# EmailMx User, Eureka User , Support users need to be created on Directory nodes.
+directory_users: "{{ emailmx_user + eureka_user + support_users }}"
+
+# Limits for 'owm' user.
+limits_scopes:
+  - name: "{{eureka_user[0].username}}"
+    limits:
+     - soft memlock unlimited
+     - hard memlock unlimited
+     - soft as unlimited
+     - hard as unlimited
+     - soft nofile 524288
+     - hard nofile 524288
+     - soft nproc 65536
+     - hard nproc 65536
+     - soft core unlimited
+     - hard core unlimited
+  - name: "{{emailmx_user[0].username}}"
+    limits:
+     - soft memlock unlimited
+     - hard memlock unlimited
+     - soft nofile 524288
+     - hard nofile 524288
+     - soft nproc 65536
+     - hard nproc 65536
+     - soft core unlimited
+     - hard core unlimited
+     
+# Define variable for Eureka 
+# You can also define variables in roles/owm-eureka/vars/main.yml
+
+# mOS variables for mOS role
+install_jdk_7_above: "true"
+#mos_version: "2.4.10-6"
+#mos_third_party_version: "2.4.2"
+
+# Variable for Eureka version
+# Reference: rpmpackges  owm-service-discovery-1.0.3-1.noarch.rpm
+eureka_version: "1.0.3-1"
+

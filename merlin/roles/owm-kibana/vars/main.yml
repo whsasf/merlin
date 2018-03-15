@@ -1,0 +1,11 @@
+---
+kibana_dir: /opt/kibana
+kibana_version: 4.2.1
+kibana_port: 5601
+kibana_host: 0.0.0.0
+elasticsearch_preserve_host: "true"
+default_kibana_index: .kibana
+default_app_id: discover
+request_timeout: 300000
+shard_timeout: 0
+verify_ssl: "true"

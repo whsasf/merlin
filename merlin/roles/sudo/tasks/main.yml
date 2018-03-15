@@ -1,0 +1,15 @@
+---
+
+- name: Install sudo package
+  yum: name={{sudo_package}} state=present
+  tags: [ 'package', 'sudo' ]
+
+- name: Create /etc/sudoers file
+  template:
+    src: sudoers.j2
+    dest: "{{sudo_file}}"
+    owner: root
+    group: root
+    mode: 0440
+    validate: visudo -cf %s
+  tags: [ 'configuration', 'sudo' ]

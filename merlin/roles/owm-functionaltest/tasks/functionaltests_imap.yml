@@ -1,0 +1,39 @@
+---
+- name: Create directories for IMAP
+  file: path=/opt/merlin/jmeter/{{ item }}/imap state=directory
+  with_items:
+    - "tests"
+    - "reports"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-imap' ]
+
+- name: Put test cases for IMAP
+  template: src=imap/{{ item.test_case }}.j2 dest=/opt/merlin/jmeter/tests/imap/{{ item.test_case }}
+  with_items:
+    - { test_case: 'Test_IMAP_authorization.jmx' }
+    - { test_case: 'Test_IMAP_fetch.jmx' }
+    - { test_case: 'Test_IMAP_fetch_envelope_body_of_mail.jmx' }
+    - { test_case: 'Test_IMAP_fetch_body_structure_of_mail.jmx' }
+    - { test_case: 'Test_IMAP_verify_copy_command.jmx' }
+    - { test_case: 'Test_IMAP_verify_create_folder_command.jmx' }
+    - { test_case: 'Test_IMAP_verify_rename_folder_command.jmx' }
+    - { test_case: 'Test_IMAP_verify_store_and_expunge_command.jmx' }
+    - { test_case: 'Test_IMAP_session_time_out.jmx' }
+    - { test_case: 'Test_IMAP_verify_notification_in_multiple_session.jmx' }
+    - { test_case: 'Test_IMAP_multithreading_using_maxsessions_key.jmx' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-imap' ]
+
+- name: Execute JMeter test cases for IMAP
+  shell: /opt/merlin/jmeter/apache-jmeter-{{jmeter_version}}/bin/jmeter -n -t /opt/merlin/jmeter/tests/imap/{{ item.test }} -l /opt/merlin/jmeter/reports/imap/{{ item.report }}
+  with_items:
+    - { test: 'Test_IMAP_authorization.jmx', report: 'Report_IMAP_authorization.jtl' }
+    - { test: 'Test_IMAP_fetch.jmx', report: 'Report_IMAP_fetch.jtl' }
+    - { test: 'Test_IMAP_fetch_envelope_body_of_mail.jmx', report: 'Report_IMAP_fetch_envelope_body_of_mail.jtl' }
+    - { test: 'Test_IMAP_fetch_body_structure_of_mail.jmx', report: 'Report_IMAP_fetch_body_structure_of_mail.jtl' }
+    - { test: 'Test_IMAP_verify_copy_command.jmx', report: 'Report_IMAP_verify_copy_command.jtl' }
+    - { test: 'Test_IMAP_verify_create_folder_command.jmx', report: 'Report_IMAP_verify_create_folder_command.jtl' }
+    - { test: 'Test_IMAP_verify_rename_folder_command.jmx', report: 'Report_IMAP_verify_rename_folder_command.jtl' }
+    - { test: 'Test_IMAP_verify_store_and_expunge_command.jmx', report: 'Report_IMAP_verify_store_and_expunge_command.jtl' }
+    - { test: 'Test_IMAP_session_time_out.jmx', report: 'Report_IMAP_session_time_out.jtl' }
+    - { test: 'Test_IMAP_verify_notification_in_multiple_session.jmx', report: 'Report_IMAP_verify_notification_in_multiple_session.jtl' }
+    - { test: 'Test_IMAP_multithreading_using_maxsessions_key.jmx', report: 'Report_IMAP_multithreading_using_maxsessions_key.jtl' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-imap' ]

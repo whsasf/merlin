@@ -1,0 +1,93 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-affinity-init', 'owm-affinity','owm-nginx' ]
+
+- name: Determine cluster name
+  set_fact:
+    node_cluster: "{{ item }}"
+  with_items: "{{ clusters }}"
+  when: hostvars[inventory_hostname]['clusterId'] is defined and hostvars[inventory_hostname]['clusterId'] == "{{ item }}"
+  tags: [ 'owm-affinity-init', 'owm-affinity','owm-nginx' ]
+
+- name: Determine node component if component is mss
+  set_fact:
+    node_component: "['mss']"
+  when: component == "mss"
+  tags: [ 'owm-affinity-init', 'owm-affinity','owm-nginx' ]
+
+- name: Determine node component if component is mos
+  set_fact:
+    node_component: "['mos']"
+  when: component == "mos"
+  tags: [ 'owm-affinity-init', 'owm-affinity','owm-nginx' ]
+
+- name: Determine node component if component is swift
+  set_fact:
+    node_component: "['swift']"
+  when: component == "swift"
+  tags: [ 'owm-affinity-init', 'owm-affinity','owm-nginx' ]
+  
+- name: Determine node component if component is failover (default mss and mos)
+  set_fact:
+    node_component: "['mss','mos']"
+  when: component == "failover" and failover is not defined
+  tags: [ 'owm-affinity-init', 'owm-affinity','owm-nginx' ]
+
+- name: Determine node component if component is failover
+  set_fact:
+    node_component: "{{ failover }}"
+  when: component == "failover" and failover is defined
+  tags: [ 'owm-affinity-init', 'owm-affinity','owm-nginx' ]
+  
+- name: Determine node component if component is kibana
+  set_fact:
+    node_component: "['kibana']"
+  when: component == "kibana"
+  tags: [ 'owm-affinity-init', 'owm-affinity','owm-nginx' ]
+
+- name: Create the Nginx directory
+  file: path={{ nginx_home_dir }} owner=root group=root mode=755 state=directory
+  tags: [ 'owm-affinity','owm-nginx' ]  
+
+- name: Create the Nginx directories
+  file: path={{ nginx_home_dir }}/nginx_{{ item }} owner=root group=root mode=755 state=directory
+  with_items: "{{ node_component }}"
+  tags: [ 'owm-affinity','owm-nginx' ]
+
+- name: Get Nginx package
+  get_url: url="{{ owm_tar_url }}/OPWVNginx_{{ owm_nginx_version}}.tar.gz" dest="{{ nginx_home_dir }}"
+  tags: [ 'owm-affinity','owm-nginx' ]
+
+- name: Extract Nginx
+  unarchive: src={{ nginx_home_dir }}/OPWVNginx_{{ owm_nginx_version}}.tar.gz dest={{ nginx_home_dir }}/nginx_{{ item }} copy=no owner=root group=root
+  with_items: "{{ node_component }}"
+  tags: [ 'owm-affinity','owm-nginx' ]
+
+- name: Create link 
+  file: src={{ nginx_home_dir }}/nginx_{{ item }}/nginx{{ owm_nginx_version }} dest={{ nginx_home_dir }}/nginx_{{ item }}/nginx state=link
+  with_items: "{{ node_component }}"
+  tags: [ 'owm-affinity','owm-nginx' ]
+
+- name: Configure Nginx
+  template: src=nginx_{{ item }}.conf.j2 dest={{ nginx_home_dir }}/nginx_{{ item }}/nginx{{ owm_nginx_version }}/conf/nginx.conf mode=755
+  with_items: "{{ node_component }}"
+  tags: [ 'owm-affinity','owm-nginx' ]
+
+- name: Fix Ownership on Nginx
+  file: path={{ nginx_home_dir }}/nginx_{{ item }} owner={{emailmx_user[0].username}} group={{emailmx_user[0].username}} recurse=yes
+  with_items: "{{ node_component }}"
+  tags: [ 'owm-affinity','owm-nginx' ]
+
+- include: centos7.yml
+  when: (ansible_distribution == "CentOS" and ansible_distribution_major_version == "7") or 
+        (ansible_distribution == "RedHat" and ansible_distribution_major_version == "7")
+  tags: [ 'owm-affinity-init', 'owm-affinity', 'startup-script' ]
+
+- include: centos6.yml
+  when: (ansible_distribution == "CentOS" and ansible_distribution_major_version == "6") or 
+        (ansible_distribution == "RedHat" and ansible_distribution_major_version == "6")
+  tags: [ 'owm-affinity-init', 'owm-affinity', 'startup-script' ]

@@ -1,0 +1,54 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-recover','setup' ]
+
+- name: Determine backup server ip
+  set_fact:
+      backupserver_ip_address: "{{ hostvars[item]['ansible_ssh_host'] }}"
+  with_items: "{{ groups[ node_site + '-backupserver'] }}"
+  tags: [ 'owm-recover','setup' ]
+
+- include: rsh_setup.yml
+  when: inventory_hostname in groups['{{ node_site }}-directory']
+  tags: [ 'owm-recover','setup' ]
+
+- include: master_dirserv_recovery.yml
+  when: inventory_hostname in groups['{{ node_site }}-directory'] and hostvars[inventory_hostname]['primary'] is defined
+  tags: [ 'owm-recover','dirserv','primary' ]
+
+- include: secondary_master_dirserv_recovery.yml
+  when: inventory_hostname in groups['{{ node_site }}-directory'] and hostvars[inventory_hostname]['primary'] is not defined
+  tags: [ 'owm-recover','dirserv','secondary' ]
+
+- include: dircacheserv_recovery.yml
+  when: inventory_hostname in groups['{{ node_site }}-directory']
+  tags: [ 'owm-recover','dircacheserv']
+  
+- include: confserv_recovery.yml
+  when: inventory_hostname in groups['{{ node_site }}-directory'] and hostvars[inventory_hostname]['primary'] is defined
+  tags: [ 'owm-recover','confserv' ]
+
+- include: cassmeta_recovery.yml
+  when: inventory_hostname in groups['cassmeta'] or inventory_hostname in groups['cassblob']
+  tags: [ 'owm-recover','cassmeta' ]
+
+- include: cassblob_recovery.yml
+  when: inventory_hostname in groups['cassmeta'] or inventory_hostname in groups['cassblob']
+  tags: [ 'owm-recover','cassblob' ]  
+  
+- include: mos_recovery.yml
+  when: inventory_hostname in groups['{{ node_site }}-directory']
+  tags: [ 'owm-recover','mos' ]
+
+- include: mos_recovery.yml
+  when: inventory_hostname in groups['{{ node_site }}-queue']
+  tags: [ 'owm-recover','mos' ]
+
+- include: affinity_recovery.yml
+  when:  ['{{ node_site }}-affinity'] is defined and inventory_hostname in groups['{{ node_site }}-affinity']
+  tags: [ 'owm-recover','affinity' ]
+

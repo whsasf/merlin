@@ -1,0 +1,389 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-mos','mx']
+
+- name: Determine cluster name
+  set_fact:
+    node_cluster: "{{ item }}"
+  with_items: "{{ clusters }}"
+  when: hostvars[inventory_hostname]['clusterId'] is defined and hostvars[inventory_hostname]['clusterId'] == "{{ item }}"
+  tags: [ 'owm-mos','mx' ]
+
+- name: Create the {{emailmx_user[0].home}}/mxos directory
+  file: path={{emailmx_user[0].home}}/mxos state=directory
+  tags: [ 'owm-mos','mx' ]
+
+- name: Check if owm-mxos-thirdparty is installed
+  command: rpm -q owm-mxos-thirdparty
+  register: rpm_check_tp
+  failed_when: rpm_check_tp.rc > 1
+  ignore_errors: True
+  changed_when: no
+  tags: [ 'owm-mos','mx' ]
+  check_mode: no
+
+- name: Fresh Install owm-mxos-thirdparty
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} rpm --prefix={{emailmx_user[0].home}}/mxos -ivh {{owm_repo_url}}/owm-mxos-thirdparty-{{mos_third_party_version}}.rpm'
+  when: rpm_check_tp.rc != 0
+  tags: [ 'owm-mos','mx' ]
+  
+#
+# Handle MX-OS third party Upgrade / Downgrade
+#
+
+- name: Set Package Name
+  set_fact: 
+    package_name_tp: "owm-mxos-thirdparty"
+  when: rpm_check_tp.rc == 0
+  tags: [ 'owm-mos','mx' ]
+
+# Check specific version
+- name: Get version of RPM
+  shell: "`which yum` list installed {{ package_name_tp }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version_tp
+  when: rpm_check_tp.rc == 0
+  changed_when: False
+  tags: [ 'owm-mos','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "System has {{ package_name_tp }}-{{rpm_version_tp.stdout}} installed"
+  when: rpm_check_tp.rc == 0
+  tags: [ 'owm-mos','mx' ]
+
+# See which version is higher or lower
+- name: Compare installed RPM version with expected version
+  shell: '/tmp/compare_versions.sh {{mos_third_party_version}} {{rpm_version_tp.stdout}}'
+  register: version_comparison_tp
+  ignore_errors: yes
+  when: rpm_check_tp.rc == 0
+  changed_when: False
+  tags: [ 'owm-mos','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "Keeping the existing {{ package_name_tp }}-{{rpm_version_tp.stdout}} installed"
+  when: rpm_check_tp.rc == 0 and version_comparison_tp.rc == 0
+  tags: [ 'owm-mos','mx' ]
+
+# Try to catch the case that user specified a RPM package that is not in the {{owm_repo_url}}
+- name: Ensure {{owm_repo_url}} contains {{ package_name_tp }}-{{mos_third_party_version}} RPM
+  uri: 
+    url: "{{owm_repo_url}}/{{ package_name_tp }}-{{mos_third_party_version}}.rpm"
+    method: GET
+    status_code: 200
+  register: rpmpkg_file
+  when: rpm_check_tp.rc == 0 and ( version_comparison_tp.rc == 1 or version_comparison_tp.rc == 2 )
+  check_mode: no
+
+- debug: 
+     msg: "{{ package_name_tp }}-{{mos_third_party_version}}.rpm is not found in {{owm_repo_url}}"
+  when: rpm_check_tp.rc == 0 and version_comparison_tp.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+  check_mode: no
+
+- name: Abort if the {{ package_name_tp }}-{{mos_third_party_version}} RPM  is missing
+  meta: end_play
+  when: rpm_check_tp.rc == 0 and version_comparison_tp.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+  check_mode: no
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name_tp }} upgrade from {{rpm_version_tp.stdout}} to {{mos_third_party_version}} ?"
+  when: rpm_check_tp.rc == 0 and version_comparison_tp.rc == 1 
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name_tp }} downgrade from {{rpm_version_tp.stdout}} to {{mos_third_party_version}} ?"
+  when: rpm_check_tp.rc == 0 and version_comparison_tp.rc == 2 
+
+- pause: seconds=30
+  when: rpm_check_tp.rc == 0 and version_comparison_tp.rc != 0
+
+- name: Stop mOS server
+  shell: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '~/lib/imservctrl kill mxos'
+  when: rpm_check_tp.rc == 0 and ( version_comparison_tp.rc == 1 or version_comparison_tp.rc == 2 )
+  ignore_errors: yes
+  tags: [ 'owm-mos','mx' ]
+
+# If application is already installed, and is a lower version do an upgrade
+- name: Upgrade {{ package_name_tp }} from {{rpm_version_tp.stdout}} to {{mos_third_party_version}}
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} rpm --prefix={{emailmx_user[0].home}}/mxos -Uvh {{owm_repo_url}}/owm-mxos-thirdparty-{{mos_third_party_version}}.rpm'
+  when: rpm_check_tp.rc == 0 and version_comparison_tp.rc == 1
+  tags: [ 'owm-mos','mx' ]
+
+# If application is already installed, and is a higher version, downgrade
+# Downgrade mx-os third party Step #1 - remove old package
+- name: Downgrade Step 1, remove old {{ package_name_tp }}-{{rpm_version_tp.stdout}} package
+  shell: 'rpm -e --nodeps {{ package_name_tp }}-{{rpm_version_tp.stdout}}'
+  when: rpm_check_tp.rc == 0 and version_comparison_tp.rc == 2
+  tags: [ 'owm-mos','mx' ]
+
+# Downgrade mx-os third party Step #2 - install older package
+- name: Downgrade Step 2, install older {{ package_name_tp }}-{{mos_third_party_version}} package
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} rpm --prefix={{emailmx_user[0].home}}/mxos -ivh {{owm_repo_url}}/owm-mxos-thirdparty-{{mos_third_party_version}}.rpm'
+  when: rpm_check_tp.rc == 0 and version_comparison_tp.rc == 2
+  tags: [ 'owm-mos','mx' ]
+
+# Check specific version
+- name: Get new version of RPM
+  shell: "`which yum` list installed {{ package_name_tp }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version_tp
+  when: rpm_check_tp.rc == 0
+  changed_when: False
+  tags: [ 'owm-mos','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "System has {{ package_name_tp }}-{{rpm_version_tp.stdout}} installed (upgrade)"
+  when: rpm_check_tp.rc == 0 and version_comparison_tp.rc == 1
+  tags: [ 'owm-mos','mx' ]
+
+- debug:
+     msg: "System has {{ package_name_tp }}-{{rpm_version_tp.stdout}} installed (downgrade)"
+  when: rpm_check_tp.rc == 0 and version_comparison_tp.rc == 2
+  tags: [ 'owm-mos','mx' ]
+
+- name: Check if owm-mxos is installed
+  command: rpm -q owm-mxos
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  check_mode: no
+  tags: [ 'owm-mos','mx' ]
+
+- name: Fresh Install owm-mxos
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} INTERMAIL={{emailmx_user[0].home}} rpm --prefix={{emailmx_user[0].home}}/mxos -ivh {{owm_repo_url}}/owm-mxos-{{mos_version}}.rpm'
+  when: rpm_check.rc != 0
+  tags: [ 'owm-mos','mx' ]
+  
+#
+# Handle MX-OS Upgrade / Downgrade
+#
+
+- name: Set Package Name
+  set_fact: 
+    package_name: "owm-mxos"
+  when: rpm_check.rc == 0
+  tags: [ 'owm-mos','mx' ]
+
+# Check specific version
+- name: Get version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-mos','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0
+  tags: [ 'owm-mos','mx' ]
+
+# See which version is higher or lower
+- name: Compare installed RPM version with expected version
+  shell: '/tmp/compare_versions.sh {{mos_version}} {{rpm_version.stdout}}'
+  register: version_comparison
+  ignore_errors: yes
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-mos','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "Keeping the existing {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0 and version_comparison.rc == 0
+  tags: [ 'owm-mos','mx' ]
+
+# Try to catch the case that user specified a RPM package that is not in the {{owm_repo_url}}
+- name: Ensure {{owm_repo_url}} contains {{ package_name }}-{{mos_version}} RPM
+  uri: 
+    url: "{{owm_repo_url}}/{{ package_name }}-{{mos_version}}.rpm"
+    method: GET
+    status_code: 200
+  register: rpmpkg_file
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  check_mode: no
+
+- debug: 
+     msg: "{{ package_name }}-{{mos_version}}.rpm is not found in {{owm_repo_url}}"
+  when: rpm_check.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+  check_mode: no
+
+- name: Abort if the {{ package_name }}-{{mos_version}} RPM  is missing
+  meta: end_play
+  when: rpm_check.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+  check_mode: no
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name }} upgrade from {{rpm_version.stdout}} to {{mos_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1 
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name }} downgrade from {{rpm_version.stdout}} to {{mos_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2 
+
+- pause: seconds=30
+  when: rpm_check.rc == 0 and version_comparison.rc != 0
+ 
+- name: Stop mOS server
+  shell: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '~/lib/imservctrl kill mxos'
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  ignore_errors: yes
+  tags: [ 'owm-mos','mx' ]
+
+# If application is already installed, and is a lower version do an upgrade
+- name: Upgrade {{ package_name }} from {{rpm_version.stdout}} to {{mos_version}}
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} INTERMAIL={{emailmx_user[0].home}} rpm --prefix={{emailmx_user[0].home}}/mxos -Uvh {{owm_repo_url}}/owm-mxos-{{mos_version}}.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'owm-mos','mx' ]
+
+# If application is already installed, and is a higher version, downgrade
+# Downgrade Step #1 - remove old package
+- name: Downgrade Step 1, remove old {{ package_name }}-{{rpm_version.stdout}} package
+  shell: 'rpm -e {{ package_name }}-{{rpm_version.stdout}}'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-mos','mx' ]
+
+# Downgrade Step #2 - install older package
+- name: Downgrade Step 2, install older {{ package_name }}-{{mos_version}} package
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} INTERMAIL={{emailmx_user[0].home}} rpm --prefix={{emailmx_user[0].home}}/mxos -ivh {{owm_repo_url}}/owm-mxos-{{mos_version}}.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-mos','mx' ]
+
+# Check specific version
+- name: Get new version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-mos','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (upgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'owm-mos','mx' ]
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (downgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-mos','mx' ]
+  
+- name: Put the hazelcast.xml file.
+  template: src=hazelcast-mxos.xml.j2 dest={{emailmx_user[0].home}}/mxos/config/hazelcast/hazelcast-mxos.xml
+  when: "inventory_hostname in groups['{{ node_site }}-queue']"
+  tags: [ 'owm-mos','mx' ]
+
+- name: Change the log level from INFO to WARN
+  replace: dest={{emailmx_user[0].home}}/mxos/config/log4j.xml regexp='<priority value="INFO" />' replace='<priority value="WARN" />'
+  tags: [ 'owm-mos','mx' ]
+
+- name: Check if {{emailmx_user[0].home}}/mxos/config/mxos.properties is installed
+  stat: path={{emailmx_user[0].home}}/mxos/config/mxos.properties
+  register: mos_properties_file_stat
+  tags: [ 'owm-mos','mx' ]
+
+- name: Update the '/etc/sysconfig/prelink' file
+  lineinfile: dest=/etc/sysconfig/prelink regexp='^PRELINKING=' line='PRELINKING=no' state=present create=yes
+  tags: [ 'owm-aide' ]
+
+- name: Change storeUserNameAsEmail property value
+  replace: dest={{emailmx_user[0].home}}/mxos/config/mxos.properties regexp='storeUserNameAsEmail=false' replace='storeUserNameAsEmail=true'
+  when:
+    - mos_properties_file_stat.stat.exists
+  tags: [ 'owm-mos','mx' ]
+
+- name: Change returnUserNameWithDomain property value
+  replace: dest={{emailmx_user[0].home}}/mxos/config/mxos.properties regexp='returnUserNameWithDomain=false' replace='returnUserNameWithDomain=true'
+  when:
+    - mos_properties_file_stat.stat.exists
+  tags: [ 'owm-mos','mx' ]
+
+- name: Change calendarStoreIntegrated property value
+  replace: dest={{emailmx_user[0].home}}/mxos/config/mxos.properties regexp='calendarStoreIntegrated=true' replace='returnUserNameWithDomain=false'
+  when:
+    - mos_properties_file_stat.stat.exists
+  tags: [ 'owm-mos','mx' ]
+
+- name: Change addressBookStoreIntegrated property value
+  replace: dest={{emailmx_user[0].home}}/mxos/config/mxos.properties regexp='addressBookStoreIntegrated=true' replace='addressBookStoreIntegrated=false'
+  when:
+    - mos_properties_file_stat.stat.exists
+  tags: [ 'owm-mos','mx' ]
+
+- name: Get the MSS hostname, PAB hostname, and CAL hostname
+  set_fact:
+    mss_hostname: "{% if groups[node_site+'-affinity-mss'] is defined %}{% for host in groups[node_site+'-affinity-mss']%}{% if hostvars[host]['clusterId']|string() == node_cluster|string() %}{{host + \"-VIP\"}}{% endif %}{% endfor %}{% else %}{% if groups[node_site+'-mss']|count == 1 %}{% for host in groups[node_site+'-mss'] %}{{host}}{% endfor %}{% endif %}{% endif %}"
+    pabcal_hostname: "{% if groups[node_site+'-pabcal'] is defined %}{% if groups[node_site+'-pabcal']|count == 1 %}{% for host in groups[node_site+'-pabcal']%}{{host}}{% endfor %}{% else %}{% for host in groups[node_site+'-pabcal']%}{% if hostvars[host]['clusterId'] == node_cluster %}{{host}}{% endif %}{% endfor %}{% endif %}{% endif %}" 
+    mOS_hostname: "{% if groups[node_site+'-affinity-mos'] is defined %}{% for host in groups[node_site+'-affinity-mos']%}{% if hostvars[host]['clusterId']|string() == node_cluster|string() %}{{host + \"-VIP\"}}{% endif %}{% endfor %}{% else %}{% if groups[node_site+'-queue']|count == 1 %}{% for host in groups[node_site+'-queue'] %}{{host}}{% endfor %}{% endif %}{% endif %}"
+  tags: [ 'owm-mos','mx' ]
+
+- name: Get the dirCacheHosts
+  set_fact:
+     dircache_hosts:  |
+       {% set space = joiner(" ") %}
+       {% for host in groups[node_site+'-'+item] -%}
+           {{ space() }}{{ host }}
+       {%- endfor %}
+  when: "inventory_hostname in groups['{{ node_site }}-{{item}}']"
+  with_items:
+    - "directory"
+    - "queue"
+  tags: [ 'owm-mos','mx' ]
+
+- name: Create directory to execute mOS ConfigDB Configurations shell script
+  file: path=/opt/merlin/mOS state=directory mode=0755 owner="root" group="root"
+  tags: [ 'owm-mos','mx' ]
+
+- name: Determine Eureka URL
+  set_fact:
+      eureka_url: |
+        {% set comma = joiner(",") %}
+        {% for host in groups[node_site + "-directory"] -%}
+                 {{ comma() }}http://{{host}}:{{eureka_port}}/eureka/
+        {%- endfor %}
+  tags: [ 'owm-mos','mx' ]
+
+- debug: msg="owm-mos eureka_url is {{eureka_url}}"
+
+- name: Copy mOSEurekaConfigdb.sh
+  template:
+    src: "mOSEurekaConfigdb.sh.j2"
+    dest: "/opt/merlin/mOS/mOSEurekaConfigdb.sh"
+    owner: "root"
+    group: "root"
+    mode: 0777
+  tags: [ 'owm-mos','mx' ]
+
+- name: Run mOSEurekaConfigdb.sh script
+  shell: /opt/merlin/mOS/mOSEurekaConfigdb.sh
+  tags: [ 'owm-mos','mx' ]
+
+- name: Copy mOSConfigdbConfigurations.sh
+  template:
+    src: "mOSConfigdbConfigurations.sh.j2"
+    dest: "/opt/merlin/mOS/mOSConfigdbConfigurations.sh"
+    owner: "root"
+    group: "root"
+    mode: 0777
+  when: "groups['{{ node_site }}-pabcalcassmeta'] is not defined"
+  tags: [ 'owm-mos','mx' ]
+
+- name: Run mOSConfigdbConfigurations.sh script
+  shell: /opt/merlin/mOS/mOSConfigdbConfigurations.sh
+  when: "groups['{{ node_site }}-pabcalcassmeta'] is not defined"
+  tags: [ 'owm-mos','mx' ]
+
+- name: Check mOS is already running
+  shell: ps -ef | grep mxos | grep -v grep|grep "$pid"|awk '{print $2}'
+  register: mOS_IS_UP
+  tags: [ 'owm-mos','mx' ]
+
+- name: Run mOS server
+  shell: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/mxos/scripts/mxos.sh start'
+  when: mOS_IS_UP.stdout == ""
+  tags: [ 'owm-mos','mx' ]

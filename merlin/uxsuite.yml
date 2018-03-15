@@ -1,0 +1,8 @@
+---
+- hosts: uxsuite
+  roles:
+    - common
+    - jdk
+    - owm-common
+    - haproxy
+    - owm-webtop

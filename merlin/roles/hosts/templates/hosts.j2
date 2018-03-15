@@ -1,0 +1,863 @@
+# {{ ansible_managed }}
+
+127.0.0.1	localhost.localdomain localhost
+::1		localhost6.localdomain6 localhost6
+
+212.69.166.138 mirrorlist.centos.org
+
+{% if groups['affinity'] is defined %}
+
+#
+# Affinity managers
+#
+{% for host in groups['affinity'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% if hostvars[host]['VIP'] is defined %}
+{{ hostvars[host]['VIP'] }}	{{ host + "-VIP" }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['cassblob'] is defined %}
+
+#
+# Cassandra blob servers
+#
+{% for host in groups['cassblobmss'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{% if host in groups[node_site] %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }} {{ blob_cluster_name }}
+{% else %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% endif %}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }} {{ blob_cluster_name }}
+{% endif %}
+{% endfor %}
+{% else %}
+{% if host in groups[node_site] %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }} {{ blob_cluster_name }}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['directory'] is defined %}
+
+#
+# Directory servers
+#
+{% for host in groups['directory'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['dns'] is defined %}
+
+#
+# DNS servers
+#
+{% for host in groups['dns'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['fep'] is defined %}
+
+#
+# FEPs
+#
+{% for host in groups['fep'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['cassmeta'] is defined %}
+
+#
+# Cassandra meta servers
+#
+{% for host in groups['cassmetamss'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{% if host in groups[node_site] %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }} {{ meta_cluster_name }}
+{% else %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% endif %}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }} {{ meta_cluster_name }}
+{% endif %}
+{% endfor %}
+{% else %}
+{% if host in groups[node_site] %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }} {{ meta_cluster_name }}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['mss'] is defined %}
+
+#
+# Message store servers
+#
+{% for host in groups['mss'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if groups['qservicecass'] is defined %}
+
+#
+# Cassandra qservice meta servers
+#
+{% for host in groups['qservicecass'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{% if host in groups[node_site] %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }} {{ qservice_cluster_name }}
+{% else %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% endif %}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }} {{ qservice_cluster_name }}
+{% endif %}
+{% endfor %}
+{% else %}
+{% if host in groups[node_site] %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }} {{ qservice_cluster_name }}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['qservice'] is defined %}
+
+#
+# Queue Service
+#
+{% for host in groups['qservice'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}      {{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}      {{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}      {{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}      {{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}      {{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}      {{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}        {{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+#
+# Queue Admin + Queue Search
+#
+{% if groups['qadminsearch'] is defined %}
+{% for host in groups['qadminsearch'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}      {{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}      {{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}      {{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}      {{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}      {{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}      {{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}        {{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if groups['queue'] is defined %}
+
+#
+# Queue servers
+#
+{% for host in groups['queue'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['smtpin'] is defined %}
+
+#
+# Inbound SMTP servers
+#
+{% for host in groups['smtpin'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['smtpout'] is defined %}
+
+#
+# Outbound SMTP servers
+#
+{% for host in groups['smtpout'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['pabcalcassmeta'] is defined %}
+
+#
+# Cassandra pab and cal meta servers
+#
+{% for host in groups['pabcalcassmeta'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{% if host in groups[node_site] %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }} {{ pim_cluster_name }}
+{% else %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% endif %}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }} {{ pim_cluster_name }}
+{% endif %}
+{% endfor %}
+{% else %}
+{% if host in groups[node_site] %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }} {{ pim_cluster_name }}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['pabcal'] is defined %}
+
+#
+# PAB/Cal servers
+#
+{% for host in groups['pabcal'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['uxsuite'] is defined %}
+
+#
+# UxSuite servers
+#
+{% for host in groups['uxsuite'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['lawfulintercept'] is defined %}
+
+#
+# Lawfulinterception servers
+#
+{% for host in groups['lawfulintercept'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['backupserver'] is defined %}
+
+#
+# Backup servers
+#
+{% for host in groups['backupserver'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['elk-search'] is defined %}
+
+#
+# ELK servers
+#
+{% for host in groups['elk-search'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['jmeter'] is defined %}
+
+#
+# Jmeter servers
+#
+{% for host in groups['jmeter'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['monitorui'] is defined %}
+
+#
+# HealthStation UI nodes
+#
+{% for host in groups['monitorui'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['razorgate'] is defined %}
+
+#
+# RazorGate servers
+#
+{% for host in groups['razorgate'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['redis'] is defined %}
+
+#
+# Redis servers
+#
+{% for host in groups['redis'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['security'] is defined %}
+
+#
+# Security servers
+#
+{% for host in groups['security'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['iperf'] is defined %}
+
+#
+# iperf servers
+#
+{% for host in groups['iperf'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['searchcass'] is defined %}
+
+#
+# Cassandra search meta servers
+#
+{% for host in groups['searchcass'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}      {{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{% if host in groups[node_site] %}
+{{ interface['address'] }}      {{ host + "-" + service_suffix }} {{ host }} {{ search_cluster_name }}
+{% else %}
+{{ interface['address'] }}      {{ host + "-" + service_suffix }} {{ host }}
+{% endif %}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}      {{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}      {{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}      {{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}      {{ host }} {{ search_cluster_name }}
+{% endif %}
+{% endfor %}
+{% else %}
+{% if host in groups[node_site] %}
+{{ hostvars[host]['ansible_ssh_host'] }}        {{ host }} {{ search_cluster_name }}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}        {{ host }}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['search'] is defined %}
+
+#
+# Search service
+#
+{% for host in groups['search'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}      {{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}      {{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}      {{ host + "-" + access_suffix }}
+{% else %}
+{{ interface['address'] }}      {{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}      {{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}        {{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+
+
+{% if groups['mxos'] is defined %}
+
+#
+# Mxos servers
+#
+{% for host in groups['mxos'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined %}
+{% if interface['vlan'] == "admin" %}
+{{ interface['address'] }}	{{ host + "-" + admin_suffix }}
+{% elif interface['vlan'] == "service" %}
+{{ interface['address'] }}	{{ host + "-" + service_suffix }} {{ host }}
+{% elif interface['vlan'] == "access" %}
+{{ interface['address'] }}	{{ host + "-" + access_suffix }}
+{% elif interface['vlan'] == "storage" %}
+{{ interface['address'] }}	{{ host + "-" + storage_suffix }}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% else %}
+{{ interface['address'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ hostvars[host]['ansible_ssh_host'] }}	{{ host }}
+{% endif %}
+{% endfor %}
+{% endif %}

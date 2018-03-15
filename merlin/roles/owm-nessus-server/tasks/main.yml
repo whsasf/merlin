@@ -1,0 +1,28 @@
+---
+- name:  Check whether Nessus security tool installed on the server.
+  shell: 'rpm -q Nessus-{{nessus_package_version}}-{{nessus_package_architecture}}'
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: true
+  changed_when: no
+  tags: [ 'owm-nessus-server' ]
+  check_mode: no
+
+- name: Install Nessus Security Server
+  shell: 'rpm --nosignature -ivh {{owm_repo_url}}/Nessus-{{nessus_package_version}}-{{nessus_package_architecture}}.rpm'
+  when: rpm_check.rc != 0
+  tags: [ 'owm-nessus-server' ]
+
+# By default, It will be installed to the location '/opt/nessus' directory.
+- name: Register Nessus Security Server
+  shell: '/opt/nessus/sbin/nessuscli fetch --register {{nessus_activation_code}}'
+  tags: [ 'owm-nessus-server' ]
+
+- name: Create User for Nessus Security Server
+  local_action: shell python {{ playbook_dir }}/roles/owm-nessus-server/files/nessus_addUser.py {{owm_nessus_username}} {{owm_nessus_password}} {{ hostvars[inventory_hostname]['ansible_ssh_host'] }}
+  tags: [ 'owm-nessus-server' ]
+
+- name: Start the Nessus Security Server
+  service: name=nessusd state=started
+  tags: [ 'owm-nessus-server' ]
+  when: not ansible_check_mode

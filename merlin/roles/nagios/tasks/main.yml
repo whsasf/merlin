@@ -1,0 +1,78 @@
+---
+- name: Install nagios 
+  yum: pkg={{ item }} state=present
+  with_items:
+  - nagios
+  - nagios-plugins
+  - nagios-plugins-nrpe
+  - nagios-plugins-ping
+  - nagios-plugins-ssh
+  - nagios-plugins-http
+  - nagios-plugins-mysql
+  - nagios-devel
+  - nagiosgraph
+  notify: restart httpd
+  tags: ['package', 'nagios']
+
+- name: Create nagios config dir
+  file: path=/etc/nagios/ansible-managed state=directory
+  tags: ['configuration', 'nagios']
+
+- name: Configure nagios
+  copy: src=nagios.cfg dest=/etc/nagios/nagios.cfg
+  notify: restart nagios
+  tags: ['configuration', 'nagios']
+
+- name: Configure localhost monitoring
+  copy: src=localhost.cfg dest=/etc/nagios/objects/localhost.cfg
+  notify: restart nagios
+  tags: ['configuration', 'nagios']
+
+- name: Configure nagios services
+  copy: src=ansible-managed-services.cfg dest=/etc/nagios/
+  tags: ['configuration', 'nagios']
+
+- name: Install get_mx_version check
+  copy: src=get_mx_version dest=/usr/lib64/nagios/plugins/get_mx_version mode=0755
+  tags: ['configuration', 'nagios']
+
+- name: Install commands.cfg
+  copy: src=commands.cfg dest=/etc/nagios/ansible-managed/commands.cfg mode=0644
+  tags: ['configuration', 'nagios']
+
+- name: Create the nagios object files
+  template: src={{ item + ".j2" }}
+            dest=/etc/nagios/ansible-managed/{{ item }}
+  with_items:
+    - cassblob.cfg
+    - cassmeta.cfg
+    - directory.cfg
+    - dns.cfg
+    - fep.cfg
+    - mss.cfg
+    - queue.cfg
+    - smtpin.cfg
+    - smtpout.cfg
+    - uxsuite.cfg
+  notify: restart nagios
+  tags: ['configuration', 'nagios']
+
+- name: Replace Nagios home page with tactical overview
+  replace: dest=/usr/share/nagios/html/index.php regexp='main.php' replace='cgi-bin/tac.cgi'
+  tags: ['configuration', 'nagios']
+
+- name: Install OWM logo
+  copy: src=owmlogo.png dest=/usr/share/nagios/html/images/owmlogo.png mode=0644
+  tags: ['configuration', 'nagios']
+
+- name: Some basic branding
+  lineinfile: dest=/usr/share/nagios/html/side.php regexp='^<a href="http://www.nagios.org" target="_blank"><img src="images/sblogo.png" height="39" width="140" border="0" alt="Nagios" /></a>$' line='<a href="http://www.owmessaging.com" target="_blank"><img src="images/owmlogo.png" height="61" width="140" border="0" alt="OWM" /></a>'
+  tags: ['configuration', 'nagios']
+
+- name: Start httpd
+  service: name=httpd state=started enabled=yes
+  tags: ['service', 'nagios']
+
+- name: Start nagios
+  service: name=nagios state=started enabled=yes
+  tags: ['service', 'nagios']

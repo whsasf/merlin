@@ -1,0 +1,7 @@
+---
+swift_listening_port: 8081
+swift_listening_port_proxy: 55015
+mos_listening_port: 8081
+mos_listening_port_proxy: 8081
+mss_listening_port: 55014
+mss_listening_port_proxy: 55014

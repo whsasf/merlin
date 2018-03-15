@@ -1,0 +1,19 @@
+---
+- name: Create directory to store script files
+  file: path={{emailmx_user[0].home}}/scripts state=directory mode=0755
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-queue','maintenance' ]
+
+- name: Maintenance script for queue
+  template:
+   src: "queue_maintenance.sh.j2"
+   dest: "{{emailmx_user[0].home}}/scripts/queue_maintenance.sh"
+   owner: "{{emailmx_user[0].username}}"
+   group: "{{emailmx_user[0].username}}"
+   mode: 0644
+  tags: ['owm-queue','maintenance']
+
+- name: Create cron job for queue maintenance
+  cron: name="Cron Job for queue maintenance" user="{{emailmx_user[0].username}}" minute="{{queue_maintenance[0].minute}}" hour="{{queue_maintenance[0].hour}}" day="{{queue_maintenance[0].day}}" month="{{queue_maintenance[0].month}}" weekday="{{queue_maintenance[0].weekday}}" job="bash {{emailmx_user[0].home}}/scripts/queue_maintenance.sh 2> /dev/null 2>&1"
+  tags: ['owm-queue','maintenance']

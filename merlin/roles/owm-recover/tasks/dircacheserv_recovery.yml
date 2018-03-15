@@ -1,0 +1,8 @@
+---
+- name: Deleting dump directory
+  file: path={{emailmx_user[0].home}}/dump state=absent
+  tags: [ 'owm-recover','dircacheserv' ]
+
+- name: To sync cache server with primary master directory server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imdirsync -v 1'
+  tags: [ 'owm-recover','dircacheserv']

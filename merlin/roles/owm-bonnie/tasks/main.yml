@@ -1,0 +1,43 @@
+---
+- name: Check if bonnie++ is installed
+  shell: rpm -qa | grep -i bonnie++
+  register: BONNIE
+  failed_when: BONNIE.rc > 1
+  ignore_errors: True
+  changed_when: no
+  tags: ['owm-bonnie']
+
+- name: Install bonnie++
+  yum: name=bonnie++ state=latest
+  when: BONNIE.rc != 0
+  tags: ['owm-bonnie']
+  
+- name: Check if bonnie++ test ran before
+  stat: path=/opt/merlin/bonnie/bonnieoutput.html
+  register: bonnietestresult_file
+  tags: ['owm-bonnie']
+  
+- name: Print Message if bonnie++ test ran before
+  debug:
+     msg: "Skip bonnie++ test, Remove /opt/merlin/bonnie/bonnieoutput.html for re-test "
+  when:
+    - bonnietestresult_file.stat.exists == True
+  tags: ['owm-bonnie']
+
+- name: Create /opt/merlin/bonnie directory
+  file: path=/opt/merlin/bonnie state=directory
+  when:
+    - bonnietestresult_file.stat.exists == False
+  tags: ['owm-bonnie']
+
+- name: Running bonnie++ test
+  shell: bonnie++ -r {{bonnie_ram}} -s {{bonnie_diskspace}} -d /tmp -b -u 0 >> /opt/merlin/bonnie/bonnietestresult.txt
+  when:
+    - bonnietestresult_file.stat.exists == False
+  tags: ['owm-bonnie']
+
+- name: Generating html output 
+  shell: tail -1 /opt/merlin/bonnie/bonnietestresult.txt | bon_csv2html > /opt/merlin/bonnie/bonnieoutput.html
+  when:
+    - bonnietestresult_file.stat.exists == False
+  tags: ['owm-boniee'] 

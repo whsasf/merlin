@@ -1,0 +1,6 @@
+---    
+- include: tomcat-server.yml
+  tags: [ 'owm-system-validation', 'owm-system-validation-tomcat' ]
+
+- include: system-validation.yml
+  tags: [ 'owm-system-validation', 'owm-system-validation-validate' ]

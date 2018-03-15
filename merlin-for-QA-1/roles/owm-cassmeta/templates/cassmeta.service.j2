@@ -1,0 +1,25 @@
+# /usr/lib/systemd/system/cassmeta.service
+
+[Unit]
+Description=Cassandra Metadata
+After=network.target
+
+[Service]
+PIDFile=/var/run/cassandra-meta/cassandra.pid
+User={{cass_user[0].username}}
+Group={{cass_user[0].username}}
+PermissionsStartOnly=true
+ExecStartPre=/bin/mkdir -p /var/run/cassandra-meta/
+ExecStartPre=/bin/chown -R {{cass_user[0].username}}:{{cass_user[0].username}} /var/run/cassandra-meta/
+ExecStart={{cass_user[0].home}}/cassandra-meta/cassandra/bin/cassandra -Dcassandra.metricsReporterConfigFile=metrics-reporter-config.yaml -f -p /var/run/cassandra-meta/cassandra.pid
+StandardOutput=journal
+StandardError=journal
+LimitNOFILE=100000
+LimitMEMLOCK=infinity
+LimitNPROC=32768
+LimitAS=infinity
+Restart=always
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

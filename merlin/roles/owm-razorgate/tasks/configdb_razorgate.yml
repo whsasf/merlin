@@ -1,0 +1,27 @@
+---
+- set_fact:
+   node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: ['owm-razorgate']
+
+- name: Determine access network IP for Razorgate - ConfigDB mode
+  set_fact:
+   rgAccessHost: "{% if hostvars[inventory_hostname]['ethernet_interfaces'] is defined %}{% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'access' %}{{ interface['address'] }}{% endif %}{% endfor %}{% endif %}"
+  tags: ['owm-razorgate']
+
+- include: init_razorgate.yml
+  tags: ['owm-razorgate']
+
+- name: Install the RazorGate ({{razorgate_type}})
+  shell: 'RG_OWNER={{razorgate_owner}} RAZORGATE_CONFIGDB={{emailmx_user[0].home}} CONFIGDB_GROUP={{razorgate_configdb_group}} rpm --nodeps -ih --prefix {{install_path}} {{owm_repo_url}}/razorgate-{{razorgate_version}}.x86_64.rpm'
+  when:  not ansible_check_mode and rpm_check.rc != 0
+  tags: ['owm-razorgate']
+
+- include: upgrade_razorgate.yml razorgate_upgrade_type={{razorgate_type}}
+  when:  not ansible_check_mode and rpm_check.rc == 0
+  tags: ['owm-razorgate']
+
+- include: start_razorgate.yml
+  when:  not ansible_check_mode
+  tags: ['owm-razorgate']

@@ -1,0 +1,29 @@
+/*This file contains Keyspace:KeyspaceBlobStore that can be created using the
+cassandra-cli command line interface as follows.
+
+bin/cassandra-cli -host localhost -port port --file conf/schema_blob
+
+The cassandra-cli includes online help that explains the statements below. You can
+accessed the help without connecting to a running cassandra instance by starting the
+client and typing "help;"
+*/
+create keyspace KeyspaceBlobStore
+    with strategy_options= {
+{% set comma = joiner(",") %}
+{% for site in sites -%}
+      {{ comma() }}'{{site}}' : '{{blobreplicationfactor}}'
+{%- endfor %}
+    } and placement_strategy = 'NetworkTopologyStrategy'
+    and durable_writes = true;
+
+use KeyspaceBlobStore;
+
+{% for i in range(0, blobmessagecf) %}
+create column family CF_Message_{{i}}
+        with comparator = LongType
+        and comment = 'This represents a message.'
+        and compression_options = {'sstable_compression' : ''}
+        and index_interval = {{cassandra_index_interval}}
+        and read_repair_chance = 0.1;
+
+{% endfor %}

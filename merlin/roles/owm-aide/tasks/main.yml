@@ -1,0 +1,27 @@
+---
+- name: Install the Aide Security tool
+  yum: name=aide state=latest
+  tags: [ 'owm-aide' ]
+
+- name: Check if prelinking is installed
+  stat: path=/usr/sbin/prelink
+  register: prelink_stat
+  tags: [ 'owm-aide' ]
+
+- name: Update the '/etc/sysconfig/prelink' file
+  lineinfile: dest=/etc/sysconfig/prelink regexp='^PRELINKING=' line='PRELINKING=no' state=present create=yes
+  when:
+    - prelink_stat.stat.exists
+  tags: [ 'owm-aide' ]
+
+- name: Initialize the Aide Database
+  shell: 'aide -init'
+  tags: [ 'owm-aide' ]
+
+- name: Rename Aide Database
+  shell: 'mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz'
+  tags: [ 'owm-aide' ]
+
+- name: Create a cron job for Aide Security Tool
+  cron: name="Cron Job for Aide" minute="{{ aide_cron_config[0].minute }}" hour="{{ aide_cron_config[0].hour }}" day="{{ aide_cron_config[0].day }}" month="{{ aide_cron_config[0].month }}" weekday="{{ aide_cron_config[0].weekday }}" job="aide --check | /usr/bin/mail -s 'AIDE run for {{ inventory_hostname }}' {{ aide_admin_email }}"
+  tags: [ 'owm-aide' ]

@@ -1,0 +1,33 @@
+- set_fact:
+    verif_arch: "x"
+
+- block:
+    - name: check {{pack.name}}-{{pack.version}} in {{owm_repo_url}}                      
+      uri:
+        url: "{{owm_repo_url}}/{{ pack.name }}-{{pack.version}}{{verif_item}}.rpm"
+        method: HEAD                                                                                 
+        status_code: 200
+      register: verif_rpmpkg_files                                                                        
+      ignore_errors: yes                                                                                
+      changed_when: false
+      when: verif_rpmpkg_files is not defined or verif_rpmpkg_files.content_type != 'application/x-rpm'               
+      with_items: "{{pack.archs}}"
+      loop_control:
+        loop_var: verif_item
+    - name: set
+      set_fact:                                                                                           
+        verif_arch="{{ verif_item.verif_item }}"
+      when: "'status' in verif_item and verif_item.status == 200"
+      with_items: "{{ verif_rpmpkg_files.results }}"                                                                  
+      loop_control:
+        loop_var: verif_item
+  check_mode: no
+
+- debug:
+    msg: "verif_arch is {{verif_arch}}"
+  when: verif_arch is defined
+
+- fail:
+    msg: "{{pack.name}}-{{pack.version}} rpm is not found in {{owm_repo_url}}"
+  when: verif_arch is not defined or verif_arch == "x"
+

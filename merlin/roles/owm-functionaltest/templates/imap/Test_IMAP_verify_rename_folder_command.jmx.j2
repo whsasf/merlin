@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="2.8" jmeter="2.13 r1665067">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <Arguments guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="g_IMAPServerName" elementType="Argument">
+            <stringProp name="Argument.name">g_IMAPServerName</stringProp>
+{% if groups['fep'] is defined %}
+{% for host in groups[node_site + '-fep'] %}
+{% if loop.index < 2 %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined and interface['vlan'] == "access" %}
+              <stringProp name="Argument.value">{{ host + "-" + access_suffix }}</stringProp>
+{% endif %}
+{% endfor %}
+{% endif %}        
+{% endif %}
+{% endfor %}
+{% endif %}
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_ImapPort" elementType="Argument">
+            <stringProp name="Argument.name">g_ImapPort</stringProp>
+            <stringProp name="Argument.value">143</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_UserPass" elementType="Argument">
+            <stringProp name="Argument.name">g_UserPass</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_imap[0].user1_password }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_UserName" elementType="Argument">
+            <stringProp name="Argument.name">g_UserName</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_imap[0].user1_username }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_Old_FolderName" elementType="Argument">
+            <stringProp name="Argument.name">g_Old_FolderName</stringProp>
+            <stringProp name="Argument.value">TestFolder</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_New_FolderName" elementType="Argument">
+            <stringProp name="Argument.name">g_New_FolderName</stringProp>
+            <stringProp name="Argument.value">NewTestFolder</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </Arguments>
+      <hashTree/>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Verify rename command works properly" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1444208113000</longProp>
+        <longProp name="ThreadGroup.end_time">1444208113000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <TCPSampler guiclass="TCPSamplerGui" testclass="TCPSampler" testname="Execute Rename and list command" enabled="true">
+          <stringProp name="TCPSampler.server">${g_IMAPServerName}</stringProp>
+          <boolProp name="TCPSampler.reUseConnection">true</boolProp>
+          <stringProp name="TCPSampler.port">${g_ImapPort}</stringProp>
+          <boolProp name="TCPSampler.nodelay">false</boolProp>
+          <stringProp name="TCPSampler.timeout"></stringProp>
+          <stringProp name="TCPSampler.request">a login ${g_UserName} ${g_UserPass}
+a rename ${g_Old_FolderName} ${g_New_FolderName}/${g_Old_FolderName}
+a list &quot;&quot; *
+a logout
+</stringProp>
+          <boolProp name="TCPSampler.closeConnection">true</boolProp>
+          <stringProp name="ConfigTestElement.username"></stringProp>
+          <stringProp name="ConfigTestElement.password"></stringProp>
+        </TCPSampler>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="1114917391">a OK LOGIN completed</stringProp>
+              <stringProp name="1595132782">a OK RENAME completed</stringProp>
+              <stringProp name="-467743312">* LIST () &quot;/&quot; &quot;${g_New_FolderName}&quot;</stringProp>
+              <stringProp name="-699833438">* LIST () &quot;/&quot; &quot;${g_New_FolderName}/${g_Old_FolderName}&quot;</stringProp>
+              <stringProp name="1439116814">a OK LIST completed</stringProp>
+              <stringProp name="1833450170">a OK LOGOUT completed</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">16</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+      <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>false</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

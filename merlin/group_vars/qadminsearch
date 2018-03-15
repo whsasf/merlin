@@ -1,0 +1,13 @@
+#Note: Change "QUORUM" to "ONE" if the backend has less than two nodes
+
+queue_admin_cassmeta_read_consistency: QUORUM
+queue_admin_cassmeta_write_consistency: QUORUM
+queue_admin_cassblob_read_consistency: QUORUM
+queue_admin_cassblob_write_consistency: QUORUM
+queue_admin_cassmeta_endpoint_port: 9042
+queue_admin_cassblob_endpoint_port: 9043
+queue_admin_version: 1.0.0.9-7 
+queue_admin_port: 8015
+queue_search_version: 1.0.0.9-7
+queue_search_port: 8014
+install_jdk_7_above: "true"

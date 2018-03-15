@@ -1,0 +1,28 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-affinity-configdb-init', 'owm-affinity-configdb' ]
+
+- name: Verify Target is Primary Conf Server
+  set_fact:
+    proceed: true
+  with_items: "{{groups['directory']}}"
+  when: "inventory_hostname == item and hostvars[inventory_hostname]['primary'] is defined"
+  tags: [ 'owm-affinity-configdb-init', 'owm-affinity-configdb' ]
+
+- name: Copy affinity-configdb.sh
+  template:
+    src: "affinity-configdb.sh.j2"
+    dest: "/tmp/affinity-configdb.sh"
+    owner: "root"
+    group: "root"
+  when: proceed is defined
+  tags: [ 'owm-affinity-configdb' ]
+
+- name: Run script UpdateConfigdb.sh
+  shell: bash /tmp/affinity-configdb.sh
+  when: proceed is defined
+  tags: [ 'owm-affinity-configdb', 'owm-affinity-configdb-run' ]

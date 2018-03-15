@@ -1,0 +1,33 @@
+#Select type of razorgate
+# Type:
+# 1. couchbase
+# 2. configdb
+# Example: razorgate_type: configdb
+
+razorgate_type: configdb
+
+
+# Install path
+
+install_path: /opt/data/rg
+
+#Settings for couchbase based razorgate
+########################################
+
+couchbase_packagename: couchbase-server-community-3.0.1
+couchbase_version: 3.0.1-1444
+couchbase_arch: centos6.x86_64
+
+# Settings for configdb based razorgate
+########################################
+
+# Currently only root user supported
+# With user other then root installation will fail
+
+razorgate_owner: root
+
+# Group name for configdb groupdefinition
+# Razorgate configdb key group
+
+razorgate_configdb_group: RG
+razorgate_version: 5.8.026-0

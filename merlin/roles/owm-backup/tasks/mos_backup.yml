@@ -1,0 +1,50 @@
+---
+- name: Check if mxos.properties exists in {{emailmx_user[0].home}}/mxos/config
+  stat: path={{ emailmx_user[0].home }}/mxos/config/mxos.properties
+  register: mosproperties_file
+  tags: [ 'owm-backup','mos','mos-backup' ]
+
+- name: Take mos config file backup
+  command: 'tar -cf {{emailmx_user[0].home}}/mxos-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz -C {{emailmx_user[0].home}}/mxos/config mxos.properties -C {{emailmx_user[0].home}}/mxos/config gateway-config.xml -C {{emailmx_user[0].home}}/mxos/config/hazelcast hazelcast-mxos.xml'
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  when: mosproperties_file.stat.exists == True
+  tags: [ 'owm-backup','mos','mos-backup' ]
+
+- name: Take mos config file backup without mxos.properties
+  command: 'tar -cf {{emailmx_user[0].home}}/mxos-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz -C {{emailmx_user[0].home}}/mxos/config gateway-config.xml -C {{emailmx_user[0].home}}/mxos/config/hazelcast hazelcast-mxos.xml'
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  when: mosproperties_file.stat.exists == False
+  tags: [ 'owm-backup','mos','mos-backup' ]
+
+- name: Copy the mos backup file into backup server
+  shell: 'rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{emailmx_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress {{emailmx_user[0].home}}/mxos-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz {{backupserver_ip_address}}:{{backup_server_path}}'
+  tags: [ 'owm-backup','mos','mos-backup' ]
+
+- name: Delete backup file after copying into backup server
+  file: path={{emailmx_user[0].home}}/mxos-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz state=absent
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-backup','mos','mos-backup' ]
+
+- name: Create directory to store script files
+  file: path={{emailmx_user[0].home}}/scripts state=directory mode=0755
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-backup','mos','mos-cronjob' ]
+
+- name: mos server backup script
+  template:
+    src: "mos_backup.sh.j2"
+    dest: "{{emailmx_user[0].home}}/scripts/mos_backup.sh"
+    owner: "{{emailmx_user[0].username}}"
+    group: "{{emailmx_user[0].username}}"
+    mode: 0644
+  tags: ['owm-backup','mos','mos-cronjob']
+
+- name: Create cron job for mos backup
+  cron: name="Cron Job for mos backup" user="{{emailmx_user[0].username}}" minute="{{mos_backup[0].minute}}" hour="{{mos_backup[0].hour}}" day="{{mos_backup[0].day}}" month="{{mos_backup[0].month}}" weekday="{{mos_backup[0].weekday}}" job="bash {{emailmx_user[0].home}}/scripts/mos_backup.sh 2> /dev/null 2>&1"
+  tags: ['owm-backup','mos','mos-cronjob']
+
+

@@ -1,0 +1,135 @@
+---
+- name: Cassandra | Make sure the cassandra log directory exists
+  file:
+    path: "{{cass_user[0].home}}/cassandra-blob/log/"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    state: directory
+    mode: 0755
+  tags: ['owm-cassblob', 'owm-cassblob-confupdates']
+
+- name: Cassandra | Update the cassandra configuration
+  template:
+    src: "{{item}}.j2"
+    dest: "{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/{{item}}"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    mode: 0644
+    backup: yes
+  with_items:
+    - "cassandra-rackdc.properties"
+    - "cassandra-topology.yaml"
+    - "commitlog_archiving.properties"
+    - "cassandra-topology.properties"
+  tags: ['owm-cassblob', 'owm-cassblob-confupdates']
+
+- name: Configuring seeds hosts in cassandra.yaml
+  lineinfile:
+    dest: '{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/cassandra.yaml'
+    state: present
+    regexp: '^(.*),ENDOFLOOP(.*)$'
+    line: '\1\2'
+    backrefs: yes
+    backup: yes
+  tags: ['owm-cassblob', 'owm-cassblob-confupdates']
+
+# this is to avoid errors on not defined configuration parameters
+- name: Create the SKIP_FLAG
+  set_fact:
+    SKIP: "__MERLIN_SKIP__{{ 999999999 | random }}"
+  tags: ['owm-cassblob', 'owm-cassblob-init', 'owm-cassblob-confupdates']
+
+- name: Assign token
+  set_fact:
+    assigned_cassandra_token: "{% for host in groups[group_id] %}{% if inventory_hostname == host %}{{cassandra_initial_token[loop.index-1]}}{% endif %}{% endfor %}"
+  tags: ['owm-cassblob', 'owm-cassblob-init', 'owm-cassblob-confupdates']
+
+- name: Cassandra | Updating cassandra-env.sh
+  lineinfile:
+    dest: "{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/cassandra-env.sh"
+    regexp: '{{item.0}}'
+    line: '{{item.1}}'
+    state: present
+    backrefs: yes
+    backup: yes
+  with_together:
+    - [ '^(#MAX_HEAP_SIZE|MAX_HEAP_SIZE)=(.*)', '^(#HEAP_NEWSIZE|HEAP_NEWSIZE)=(.*)', '(.*)-XX:CMSInitiatingOccupancyFraction=(\d+)(.*)', '^JMX_PORT="(\d+)"' ]
+    - [ 'MAX_HEAP_SIZE="{{cassandra_max_heap_size|default(SKIP)}}"', 'HEAP_NEWSIZE="{{cassandra_heap_newsize|default(SKIP)}}"', '\1-XX:CMSInitiatingOccupancyFraction={{cassandra_CMSInitiatingOccupancyFraction|default(SKIP)}}\3', 'JMX_PORT="{{cassandra_jmx_port}}"' ]
+    - [ '{{cassandra_max_heap_size|default(SKIP)}}', '{{cassandra_heap_newsize|default(SKIP)}}', '{{cassandra_CMSInitiatingOccupancyFraction|default(SKIP)}}', '{{cassandra_jmx_port|default(SKIP)}}' ]
+  when: item.2!=SKIP
+  tags: ['owm-cassblob','owm-cassblob-cassandra-env', 'owm-cassblob-confupdates']
+
+- name: Cassandra | Updating cassandra-env.sh (2)
+  lineinfile:
+    dest: "{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/cassandra-env.sh"
+    line: 'JVM_OPTS="$JVM_OPTS -Dorg.xerial.snappy.tempdir={{ cass_user[0].home }}/cassandra-blob/log"'
+    insertafter: 'EOF'
+    state: present
+  tags: ['owm-cassblob','owm-cassblob-cassandra-env', 'owm-cassblob-confupdates']
+
+- name: Cassandra | Updating logdir on cassandra startup
+  lineinfile:
+    dest: '{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/bin/cassandra'
+    regexp: '{{item.0}}'
+    line: '{{item.1}}'
+    backrefs: yes
+    backup: yes
+  with_together:
+    - [ '(.*)-Dcassandra.logdir=([a-zA-Z\/\$_\.\-]+)(.*)' ]
+    - [ '\1-Dcassandra.logdir={{cass_user[0].home}}/cassandra-blob/log/\3' ]
+  tags: ['owm-cassblob','owm-cassblob-cassandra-bin', 'owm-cassblob-confupdates']
+
+- name: Cassandra | Updating cassandra.yaml (1)
+  replace:
+    dest: "{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/cassandra.yaml"
+    regexp: '{{item.0}}'
+    replace: '{{item.1}}'
+  with_together:
+    - [ '^(# |)cluster_name:(.*)', '^(# |)num_tokens:(.*)', '^(# |)initial_token:(.*)', '^hinted_handoff_enabled:(.*)', '^(# |)max_hint_window_in_ms:(.*)', '^(# |)hinted_handoff_throttle_in_kb:(.*)', '^(# |)max_hints_delivery_threads:(.*)', '^(# |)authenticator:(.*)', '^(# |)authorizer:(.*)', '^(# |)permissions_validity_in_ms:(.*)', '^(# |)partitioner:(.*)', '^(# |)disk_failure_policy:(.*)', '^(# |)commit_failure_policy:(.*)', '^(# |)key_cache_size_in_mb:(.*)', '^(# |)key_cache_save_period:(.*)', '^(# |)row_cache_size_in_mb:(.*)', '^(# |)row_cache_save_period:(.*)', '^(# |)memory_allocator:(.*)', '^commitlog_sync:(.*)', '^(# |)commitlog_sync_period_in_ms:(.*)', '^(# |)commitlog_segment_size_in_mb:(.*)', '^(# |)concurrent_reads:(.*)', '^(# |)concurrent_writes:(.*)', '^(# |)trickle_fsync:(.*)', '^(# |)trickle_fsync_interval_in_kb:(.*)', '^(# |)storage_port:(.*)', '^(# |)ssl_storage_port:(.*)', '^(# |)start_native_transport:(.*)', '^(# |)native_transport_port:(.*)', '^(# |)start_rpc:(.*)', '^(# |)rpc_address:(.*)', '^(# |)rpc_port:(.*)', '^(# |)rpc_keepalive:(.*)', '^(# |)rpc_server_type:(.*)', '^(# |)rpc_min_threads:(.*)', '^(# |)rpc_max_threads:(.*)', '^(# |)thrift_framed_transport_size_in_mb:(.*)', '^(# |)incremental_backups:(.*)', '^(# |)snapshot_before_compaction:(.*)', '^(# |)auto_snapshot:(.*)', '^(# |)tombstone_failure_threshold:(.*)', '^(# |)column_index_size_in_kb:(.*)', '^(# |)batch_size_warn_threshold_in_kb:(.*)', '^(# |)compaction_throughput_mb_per_sec:(.*)', '^(# |)read_request_timeout_in_ms:(.*)', '^(# |)range_request_timeout_in_ms:(.*)', '^(# |)write_request_timeout_in_ms:(.*)', '^(# |)cas_contention_timeout_in_ms:(.*)', '^(# |)truncate_request_timeout_in_ms:(.*)', '^(# |)request_timeout_in_ms:(.*)', '^(# |)cross_node_timeout:(.*)', '^(# |)endpoint_snitch:(.*)', '^(# |)dynamic_snitch_update_interval_in_ms:(.*)', '^(# |)dynamic_snitch_reset_interval_in_ms:(.*)', '^(# |)dynamic_snitch_badness_threshold:(.*)', '^(# |)request_scheduler:(.*)', '^(# |)internode_compression:(.*)', '^(# |)inter_dc_tcp_nodelay:(.*)', '^(# |)concurrent_counter_writes:(.*)', '^(# |)tombstone_warn_threshold:(.*)', '^(# |)counter_write_request_timeout_in_ms:(.*)', '^(# |)data_file_directories:(.*)', '^(# |)batchlog_replay_throttle_in_kb:(.*)', '^(# |)tombstone_warn_threshold:(.*)', '^(# |)compaction_large_partition_warning_threshold_mb:(.*)', '^(# |)sstable_preemptive_open_interval_in_mb:(.*)' ]
+    - [ "cluster_name: '{{cassandra_cluster_name}}'", 'num_tokens: {{cassandra_num_tokens}}', 'initial_token: {{assigned_cassandra_token}}', 'hinted_handoff_enabled: {{cassandra_hinted_handoff_enabled}}', 'max_hint_window_in_ms: {{cassandra_max_hint_window_in_ms}}', 'hinted_handoff_throttle_in_kb: {{cassandra_hinted_handoff_throttle_in_kb}}', 'max_hints_delivery_threads: {{cassandra_max_hints_delivery_threads}}', 'authenticator: {{cassandra_authenticator}}', 'authorizer: {{cassandra_authorizer}}', 'permissions_validity_in_ms: {{cassandra_permissions_validity_in_ms}}', 'partitioner: {{cassandra_partitioner}}', 'disk_failure_policy: {{cassandra_disk_failure_policy}}', 'commit_failure_policy: {{cassandra_commit_failure_policy}}', 'key_cache_size_in_mb: {{cassandra_key_cache_size_in_mb}}', 'key_cache_save_period: {{cassandra_key_cache_save_period}}', 'row_cache_size_in_mb: {{cassandra_row_cache_size_in_mb}}', 'row_cache_save_period: {{cassandra_row_cache_save_period}}', 'memory_allocator: {{cassandra_memory_allocator}}', 'commitlog_sync: {{cassandra_commitlog_sync}}', 'commitlog_sync_period_in_ms: {{cassandra_commitlog_sync_period_in_ms}}', 'commitlog_segment_size_in_mb: {{cassandra_commitlog_segment_size_in_mb}}', 'concurrent_reads: {{cassandra_concurrent_reads}}', 'concurrent_writes: {{cassandra_concurrent_writes}}', 'trickle_fsync: {{cassandra_trickle_fsync}}', 'trickle_fsync_interval_in_kb: {{cassandra_trickle_fsync_interval_in_kb}}', 'storage_port: {{cassandra_blob_storage_port}}', 'ssl_storage_port: {{cassandra_blob_ssl_storage_port}}', 'start_native_transport: {{cassandra_start_native_transport}}', 'native_transport_port: {{cassandra_blob_native_transport_port}}', 'start_rpc: {{cassandra_start_rpc}}', 'rpc_address: {{ inventory_hostname }}', 'rpc_port: {{cassandra_blob_rpc_port}}', 'rpc_keepalive: {{cassandra_rpc_keepalive}}', 'rpc_server_type: {{cassandra_rpc_server_type}}', 'rpc_min_threads: {{cassandra_rpc_min_threads}}', 'rpc_max_threads: {{cassandra_rpc_max_threads}}', 'thrift_framed_transport_size_in_mb: {{cassandra_thrift_framed_transport_size_in_mb}}', 'incremental_backups: {{cassandra_incremental_backups}}', 'snapshot_before_compaction: {{cassandra_snapshot_before_compaction}}', 'auto_snapshot: {{cassandra_auto_snapshot}}', 'tombstone_failure_threshold: {{cassandra_tombstone_failure_threshold}}', 'column_index_size_in_kb: {{cassandra_column_index_size_in_kb}}', 'batch_size_warn_threshold_in_kb: {{cassandra_batch_size_warn_threshold_in_kb}}', 'compaction_throughput_mb_per_sec: {{cassandra_compaction_throughput_mb_per_sec}}', 'read_request_timeout_in_ms: {{cassandra_read_request_timeout_in_ms}}', 'range_request_timeout_in_ms: {{cassandra_range_request_timeout_in_ms}}', 'write_request_timeout_in_ms: {{cassandra_write_request_timeout_in_ms}}', 'cas_contention_timeout_in_ms: {{cassandra_cas_contention_timeout_in_ms}}', 'truncate_request_timeout_in_ms: {{cassandra_truncate_request_timeout_in_ms}}', 'request_timeout_in_ms: {{cassandra_request_timeout_in_ms}}', 'cross_node_timeout: {{cassandra_cross_node_timeout}}', 'endpoint_snitch: {{cassandra_endpoint_snitch}}', 'dynamic_snitch_update_interval_in_ms: {{cassandra_dynamic_snitch_update_interval_in_ms}}', 'dynamic_snitch_reset_interval_in_ms: {{cassandra_dynamic_snitch_reset_interval_in_ms}}', 'dynamic_snitch_badness_threshold: {{cassandra_dynamic_snitch_badness_threshold}}', 'request_scheduler: {{cassandra_request_scheduler}}', 'internode_compression: {{cassandra_internode_compression}}', 'inter_dc_tcp_nodelay: {{cassandra_inter_dc_tcp_nodelay}}', 'concurrent_counter_writes: {{cassandra_concurrent_counter_writes}}', 'tombstone_warn_threshold: {{cassandra_tombstone_warn_threshold}}', 'counter_write_request_timeout_in_ms: {{cassandra_counter_write_request_timeout_in_ms}}', 'data_file_directories:', 'batchlog_replay_throttle_in_kb: {{cassandra_batchlog_replay_throttle_in_kb}}', 'tombstone_warn_threshold: {{cassandra_tombstone_warn_threshold}}', 'compaction_large_partition_warning_threshold_mb: {{cassandra_compaction_large_partition_warning_threshold_mb}}', 'sstable_preemptive_open_interval_in_mb: {{cassandra_sstable_preemptive_open_interval_in_mb}}' ]
+    - [ '{{cassandra_cluster_name}}', '{{cassandra_num_tokens}}', '{{assigned_cassandra_token}}', '{{cassandra_hinted_handoff_enabled}}', '{{cassandra_max_hint_window_in_ms}}', '{{cassandra_hinted_handoff_throttle_in_kb}}', '{{cassandra_max_hints_delivery_threads}}', '{{cassandra_authenticator}}', '{{cassandra_authorizer}}', '{{cassandra_permissions_validity_in_ms}}', '{{cassandra_partitioner}}', '{{cassandra_disk_failure_policy}}', '{{cassandra_commit_failure_policy}}', '{{cassandra_key_cache_size_in_mb}}', '{{cassandra_key_cache_save_period}}', '{{cassandra_row_cache_size_in_mb}}', '{{cassandra_row_cache_save_period}}', '{{cassandra_memory_allocator}}', '{{cassandra_commitlog_sync}}', '{{cassandra_commitlog_sync_period_in_ms}}', '{{cassandra_commitlog_segment_size_in_mb}}', '{{cassandra_concurrent_reads}}', '{{cassandra_concurrent_writes}}', '{{cassandra_trickle_fsync}}', '{{cassandra_trickle_fsync_interval_in_kb}}', '{{cassandra_blob_storage_port}}', '{{cassandra_blob_ssl_storage_port}}', '{{cassandra_start_native_transport}}', '{{cassandra_blob_native_transport_port}}', '{{cassandra_start_rpc}}', '{{inventory_hostname}}', '{{cassandra_blob_rpc_port}}', '{{cassandra_rpc_keepalive}}', '{{cassandra_rpc_server_type}}', '{{cassandra_rpc_min_threads}}', '{{cassandra_rpc_max_threads}}', '{{cassandra_thrift_framed_transport_size_in_mb}}', '{{cassandra_incremental_backups}}', '{{cassandra_snapshot_before_compaction}}', '{{cassandra_auto_snapshot}}', '{{cassandra_tombstone_failure_threshold}}', '{{cassandra_column_index_size_in_kb}}', '{{cassandra_batch_size_warn_threshold_in_kb}}', '{{cassandra_compaction_throughput_mb_per_sec}}', '{{cassandra_read_request_timeout_in_ms}}', '{{cassandra_range_request_timeout_in_ms}}', '{{cassandra_write_request_timeout_in_ms}}', '{{cassandra_cas_contention_timeout_in_ms}}', '{{cassandra_truncate_request_timeout_in_ms}}', '{{cassandra_request_timeout_in_ms}}', '{{cassandra_cross_node_timeout}}', '{{cassandra_endpoint_snitch}}', '{{cassandra_dynamic_snitch_update_interval_in_ms}}', '{{cassandra_dynamic_snitch_reset_interval_in_ms}}', '{{cassandra_dynamic_snitch_badness_threshold}}', '{{cassandra_request_scheduler}}', '{{cassandra_internode_compression}}', '{{cassandra_inter_dc_tcp_nodelay}}', '{{cassandra_concurrent_counter_writes}}', '{{cassandra_tombstone_warn_threshold}}', '{{cassandra_counter_write_request_timeout_in_ms}}', '{{cassandra_batchlog_replay_throttle_in_kb}}', '{{cassandra_tombstone_warn_threshold}}', '{{cassandra_compaction_large_partition_warning_threshold_mb}}', '{{cassandra_sstable_preemptive_open_interval_in_mb}}' ]
+  when: item.2!=SKIP
+  tags: ['owm-cassblob','owm-cassblob-cassandra-yaml', 'owm-cassblob-confupdates']
+
+- name: Cassandra | Update data file directories in cassandra.yaml
+  lineinfile:
+    dest: "{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/cassandra.yaml"
+    insertafter: '^data_file_directories:'
+    line: '    - {{item}}'
+  when: data_file_directories is defined
+  with_items: '{{data_file_directories|default([])}}'
+  tags: ['owm-cassblob','owm-cassblob-cassandra-yaml', 'owm-cassblob-confupdates']
+
+- name: Cassandra | Updating cassandra.yaml (2)
+  lineinfile:
+    dest: "{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/cassandra.yaml"
+    insertafter: '^data_file_directories:'
+    line: '    - {{cass_user[0].home}}/cassandra-blob/data'
+  when: data_file_directories is not defined
+  tags: ['owm-cassblob','owm-cassblob-cassandra-yaml', 'owm-cassblob-confupdates']
+
+- set_fact:
+    cassandra_seeds_list: "{%if groups[node_site+'-'+group_id] is defined %}{% if inventory_hostname in groups[node_site+'-'+group_id] %}{% for site in sites %}{% set cassblobhosts = site+'-'+group_id %}{% set blobhostcounter = 0 %}{% if cassblobhosts is defined %}{% for host in groups[cassblobhosts] %}{% if blobhostcounter < 2 %}{% for interface in hostvars[host]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'storage' %}{{ host + '-' + storage_suffix }}{% endif %}{% endfor %},{% set blobhostcounter = blobhostcounter + 1 %}{% endif %}{% endfor %}{% endif %}{% endfor %}{% endif %}{% endif %}"
+
+- set_fact:
+    cassandra_listen_address: "{% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'storage' %}{{ interface['address'] }}{% endif %}{% endfor %}"
+  tags: ['owm-cassblob', 'owm-cassblob-init', 'owm-cassblob-confupdates']
+      
+- set_fact:
+    cassandra_broadcast_address: "{% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'storage' %}{{ interface['address'] }}{% endif %}{% endfor %}"
+  tags: ['owm-cassblob', 'owm-cassblob-init', 'owm-cassblob-confupdates']
+  
+- name: Cassandra | Update saved caches and commitlog paths and seeds in cassandra.yaml
+  lineinfile:
+    dest: "{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/cassandra.yaml"
+    regexp: '{{item.0}}'
+    line: '{{item.1}}'
+    backrefs: yes
+  with_together:
+    - [ '^(# commitlog_directory|commitlog_directory):(.*)', '^(# saved_caches_directory|saved_caches_directory):(.*)', '(\s+)- seeds:(.*)', '^listen_address:(.*)', '^(# broadcast_address|broadcast_address):(.*)' ]
+    - [ 'commitlog_directory: {% if commitlog_directory is defined %}{{ commitlog_directory }}{% else %}{{cass_user[0].home}}/cassandra-blob/commitlog{% endif %}', 'saved_caches_directory: {% if saved_caches_directory is defined %}{{ saved_caches_directory }}{% else %}{{cass_user[0].home}}/cassandra-blob/saved_caches{% endif %}', '\1- seeds: {{cassandra_seeds_list}}', 'listen_address: {{cassandra_listen_address}}', 'broadcast_address: {{cassandra_broadcast_address}}' ]
+  tags: ['owm-cassblob','owm-cassblob-cassandra-yaml', 'owm-cassblob-confupdates']
+
+- name: Cassandra | Rename the 'metrics-reporter-config-sample.yaml' file
+  command: cp -vaf {{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/metrics-reporter-config-sample.yaml {{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/metrics-reporter-config.yaml
+  tags: ['owm-cassblob', 'owm-cassblob-confupdates']

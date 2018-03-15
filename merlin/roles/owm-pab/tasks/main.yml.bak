@@ -1,0 +1,255 @@
+---
+- debug:
+      msg: "pab proxy is {{pab_proxy}}"
+  when: pab_proxy is defined
+
+- name: Set proxy version
+  set_fact:
+    sw_version: "{{pab_proxy_version}}"
+  when: pab_proxy is defined and pab_proxy == 1
+
+- name: Set proxy version
+  set_fact:
+    sw_version: "{{pab_version}}"
+  when: pab_proxy is not defined or pab_proxy != 1
+
+- name:  Check if owm-pab is installed
+  command: rpm -q owm-pab
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  tags: [ 'package', 'owm-pab' ]
+  check_mode: no
+
+- set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'package', 'owm-pab' ]
+ 
+- fail: 
+    msg: "Could not determine node site"
+  when: node_site is not defined
+
+- name: Set pabcal_cass_hostnames
+  set_fact:
+      pabcal_cass_hostnames: |
+          {% set comma = joiner(",") %}
+          {% for host in groups[node_site + "-pabcalcassmeta"] -%}
+            {{ comma() }}{{ host }}
+          {%- endfor %}
+  when: (pab_proxy is not defined or pab_proxy != 1) and groups[node_site + "-pabcalcassmeta"] is defined
+  tags: [ 'package', 'owm-pab' ]
+
+- fail:
+    msg: "Failed to determine pabcal cassandra hostnames"
+  when: (pab_proxy is not defined or pab_proxy != 1) and pabcal_cass_hostnames is not defined
+
+- fail:
+    msg: "Failed to determine pabcal_cassmeta_endpoint_port. Ensure pabcal_cassmeta_endpoint_port is set in file group/pabcal."
+  when: (pab_proxy is not defined or pab_proxy != 1) and pabcal_cassmeta_endpoint_port is not defined
+
+- name: Remove newline in pabcal_cass_hostnames
+  set_fact:
+      pabcal_cass_hostnames: "{{ pabcal_cass_hostnames | replace('\n', '') }}"
+  when: pabcal_cass_hostnames is defined
+  tags: [ 'package', 'owm-pab' ]
+
+- debug: msg="owm-pab pabcal_cass_hostnames is {{pabcal_cass_hostnames}}"
+  when: pabcal_cass_hostnames is defined
+
+- name: Fresh install owm-pab backend
+  shell: 'CASS_CONTACT_POINTS={{pabcal_cass_hostnames}} CASS_PORT={{pabcal_cassmeta_endpoint_port}} CASS_KEYSPACE=pab INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} GROUP_SITE={{node_site}} PAB_CLUSTER_NAME=pab_cluster rpm -ivh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-pab-{{sw_version}}.el6.x86_64.rpm'
+  when: pabcal_cass_hostnames is defined and rpm_check.rc != 0
+  tags: [ 'package', 'owm-pab' ]
+
+
+- name: Fresh install owm-pab proxy
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} GROUP_SITE={{node_site}} PAB_CLUSTER_NAME=pab_cluster rpm -ivh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-pab-{{sw_version}}.el6.x86_64.rpm'
+  when: pabcal_cass_hostnames is not defined and rpm_check.rc != 0
+  tags: [ 'package', 'owm-pab' ]
+
+# Handle Upgrade / Downgrade
+
+- name: Set Package Name
+  set_fact: 
+    package_name: "owm-pab"
+  when: rpm_check.rc == 0
+  tags: [ 'package', 'owm-pab' ]
+
+
+# Check installed version
+
+- name: Get version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'package', 'owm-pab' ]
+  check_mode: no
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0
+  tags: [ 'package', 'owm-pab' ]
+
+
+# See which version is higher or lower
+
+- name: Compare installed RPM version with expected version
+  shell: '/tmp/compare_versions.sh {{sw_version}} {{rpm_version.stdout}}'
+  register: version_comparison
+  ignore_errors: yes
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'package', 'owm-pab' ]
+  check_mode: no
+
+- debug:
+     msg: "Keeping the existing {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0 and version_comparison.rc == 0
+  tags: [ 'package', 'owm-pab' ]
+
+
+# Try to catch the case that user specified a RPM package that is not in the {{owm_repo_url}}
+
+- name: Ensure {{owm_repo_url}} contains {{ package_name }}-{{sw_version}} RPM
+  uri: 
+    url: "{{owm_repo_url}}/{{ package_name }}-{{sw_version}}.el6.x86_64.rpm"
+    method: HEAD
+    status_code: 200
+  register: rpmpkg_file
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  check_mode: no
+
+- debug: 
+     msg: "{{ package_name }}-{{sw_version}}.el6.x86_64.rpm is not found in {{owm_repo_url}}"
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ) and rpmpkg_file.content_type != "application/x-rpm"
+  check_mode: no
+
+- name: Abort if the {{ package_name }}-{{sw_version}} RPM  is missing
+  meta: end_play
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ) and rpmpkg_file.content_type != "application/x-rpm"
+  check_mode: no
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name }} upgrade from {{rpm_version.stdout}} to {{sw_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1 
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name }} downgrade from {{rpm_version.stdout}} to {{sw_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2 
+
+- pause: seconds=30
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+
+- name: Stop the PAB service
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl stop pabd'
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  tags: [ 'package', 'owm-pab' ]
+
+
+# If application is already installed, and is a lower version do an upgrade
+
+- name: Upgrade {{ package_name }} from {{rpm_version.stdout}} to {{sw_version}}
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} rpm -Uvh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-pab-{{sw_version}}.el6.x86_64.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'package', 'owm-pab' ]
+ 
+
+# If application is already installed, and is a higher version, downgrade
+
+# Downgrade Step #1 - remove old package
+#
+- name: Downgrade Step 1, remove old {{ package_name }}-{{rpm_version.stdout}} package
+  shell: 'rpm -e {{ package_name }}-{{rpm_version.stdout}}'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'package', 'owm-pab' ]
+
+
+# Downgrade Step #2 - install older package
+#
+- name: Downgrade Step 2, install older {{ package_name }}-{{sw_version}} backend package
+  shell: 'CASS_CONTACT_POINTS={{pabcal_cass_hostnames}} CASS_PORT={{pabcal_cassmeta_endpoint_port}} CASS_KEYSPACE=pab INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} GROUP_SITE={{node_site}} PAB_CLUSTER_NAME=pab_cluster rpm -ivh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-pab-{{sw_version}}.el6.x86_64.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2 and pabcal_cass_hostnames is defined
+  tags: [ 'package', 'owm-pab' ]
+
+- name: Downgrade Step 2, install older {{ package_name }}-{{sw_version}} proxy package
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} GROUP_SITE={{node_site}} PAB_CLUSTER_NAME=pab_cluster rpm -ivh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-pab-{{sw_version}}.el6.x86_64.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2 and pabcal_cass_hostnames is not defined
+  tags: [ 'package', 'owm-pab' ]
+
+- name: Get new version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  changed_when: False
+  tags: [ 'package', 'owm-pab' ]
+  check_mode: no
+
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (upgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'package', 'owm-pab' ]
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (downgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'package', 'owm-pab' ]
+
+
+
+- name: Create directory to execute PAB ConfigDB Configurations shell script
+  file: path=/opt/merlin/pab state=directory mode=0755 owner="root" group="root"
+  when: rpm_check.rc != 0
+  tags: [ 'package', 'owm-pab' ]
+
+- name: Determine Eureka URL
+  set_fact:
+      eureka_url: |
+        {% set comma = joiner(",") %}
+        {% for host in groups[node_site + "-directory"] -%}
+                 {{ comma() }}http://{{host}}:{{eureka_port}}/eureka/
+        {%- endfor %}
+  when: rpm_check.rc != 0
+  tags: [ 'package', 'owm-pab' ]
+
+- debug: msg="owm-pab eureka_url is {{eureka_url}}"
+  when: rpm_check.rc != 0
+
+- name: Copy pabEurekaConfigdb.sh
+  template:
+    src: "pabEurekaConfigdb.sh.j2"
+    dest: "/opt/merlin/pab/pabEurekaConfigdb.sh"
+    owner: "root"
+    group: "root"
+    mode: 0777
+  when: rpm_check.rc != 0
+  tags: [ 'package', 'owm-pab' ]
+
+- name: Run pabEurekaConfigdb.sh script
+  shell: /opt/merlin/pab/pabEurekaConfigdb.sh
+  when: rpm_check.rc != 0
+  tags: [ 'package', 'owm-pab' ]
+
+- name: Copy pabProxy.sh
+  template:
+    src: "pabProxy.sh.j2"
+    dest: "/opt/merlin/pab/pabProxy.sh"
+    owner: "root"
+    group: "root"
+    mode: 0777
+  when: rpm_check.rc != 0 and pabcal_cass_hostnames is not defined
+  tags: [ 'package', 'owm-pab' ]
+
+- name: Run pabProxy.sh script
+  shell: /opt/merlin/pab/pabProxy.sh
+  when: rpm_check.rc != 0 and pabcal_cass_hostnames is not defined
+  tags: [ 'package', 'owm-pab' ]
+
+- name: Start owm-pab server
+  shell: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl start pabd'
+  when: rpm_check.rc != 0 or (rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ))
+  tags: [ 'package', 'owm-pab' ]

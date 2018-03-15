@@ -1,0 +1,9 @@
+#!/bin/bash
+#Create timestamp variable
+timestamp=$(date '+%Y%m%d_%H%M')
+#Take cassandra files backup
+tar -cf {{cass_user[0].home}}/cassandra-meta-{{inventory_hostname}}-$timestamp.tar.gz -C {{cass_user[0].home}}/cassandra-meta data -C {{cass_user[0].home}}/cassandra-meta saved_caches -C {{cass_user[0].home}}/cassandra-meta commitlog
+#Copy Cassandra backup files into backup server
+rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{cass_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress {{cass_user[0].home}}/cassandra-meta-{{inventory_hostname}}-$timestamp.tar.gz root@{{backupserver_ip_address}}:{{backup_server_path}}
+#Delete Cassandra backup file after copying into backup server
+rm -rf {{cass_user[0].home}}/cassandra-meta-{{inventory_hostname}}-$timestamp.tar.gz

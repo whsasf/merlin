@@ -1,0 +1,36 @@
+// Basic single node testing. Update replication strategy for the proper usage.
+// Use the following definition for single node lab environments.
+// CREATE KEYSPACE IF NOT EXISTS mx_metadata WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};
+
+// Use the following definition for 
+CREATE KEYSPACE IF NOT EXISTS mx_metadata
+  WITH REPLICATION = {
+     'class' : 'NetworkTopologyStrategy',
+{% set comma = joiner(",") %}
+{% for site in sites -%}
+      {{ comma() }}'{{site}}' : '{{metareplicationfactor}}'
+{%- endfor %}
+    }
+  AND DURABLE_WRITES = true;
+
+// CF_Mailbox reworked, altered to mailbox with statistics broken out in to folder_buckets.
+CREATE TABLE IF NOT EXISTS mx_metadata.mailbox (
+    mailboxid           text,
+    msshost             text static,           // STATIC: msshost is set by active mss using CAS during critical operations on this mailbox.
+    version             text static,            // STATIC row, mailbox-wide data version
+    flags               blob static,            // STATIC, mailbox wide flags (can we break this out further? Need more information.)
+    adminstate          text static,           // STATIC, mailbox administrative state. 
+    refhost             text static,            // referral host
+    lastaccess          timestamp static,       // STATIC last access data for mailbox.
+    mbxdeleted          boolean static,         // Mailbox deletion flag
+    lastharddelete      timestamp static,       // STATIC, last time hard deletion was run on this mailbox.
+    autoreply_enabled   set<varint> static,     // Set of active autoreply types (1: Auto reply, 5: Mail SIEVE, others)
+    folderId            timeuuid,               // clustering column,
+    parentFolderId      timeuuid,               // Folder Scope   
+    name                text,                   // Folder Name
+    index_versions      map<varint, varint> static, // Index_versions replaces both field 8 and 9 in 'info' field.
+    PRIMARY KEY(mailboxid, folderid)
+) WITH CLUSTERING ORDER BY (folderid ASC)
+    AND comment = 'Mailbox record - contains folder pointers and global stats'
+    AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+    AND speculative_retry = 'NONE';

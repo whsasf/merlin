@@ -1,0 +1,14 @@
+ethernet_interfaces:
+ - device: eth0
+   vlan: admin
+   bootproto: static
+   address: 10.49.3.23
+   netmask: 255.255.255.0
+   gateway: 192.168.10.1
+ - device: eth1
+   vlan: service
+   bootproto: static
+   address: 10.49.3.23
+   netmask: 255.255.255.0
+
+clusterId: cluster02

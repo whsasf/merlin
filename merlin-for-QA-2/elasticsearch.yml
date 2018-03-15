@@ -1,0 +1,8 @@
+---
+- hosts: elk
+  roles:
+    - common
+    - jdk
+    - owm-elk-search
+# Monitor UI is now a separate component that installs the agents it needs
+#    - owm-logstash-indexer

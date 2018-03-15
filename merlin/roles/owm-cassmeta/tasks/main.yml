@@ -1,0 +1,156 @@
+---
+- name: Select the site
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: ['owm-cassmeta', 'owm-cassmeta-init']
+
+- name: MSS group check
+  set_fact:
+    is_mss: true
+    group_id: 'cassmeta'
+  when: groups[node_site+'-cassmeta'] is defined and inventory_hostname in groups[node_site+'-cassmeta']
+  tags: ['owm-cassmeta', 'owm-cassmeta-init']
+
+- name: QService group check
+  set_fact:
+    is_qservice: true
+    group_id: 'qservicecass'
+  when: groups[node_site+'-qservicecass'] is defined and inventory_hostname in groups[node_site+'-qservicecass']
+  tags: ['owm-cassmeta', 'owm-cassmeta-init']
+
+- name: PAB/CAL group check
+  set_fact:
+    is_pabcal: true
+    group_id: 'pabcalcassmeta'
+  when: groups[node_site+'-pabcalcassmeta'] is defined and inventory_hostname in groups[node_site+'-pabcalcassmeta']
+  tags: ['owm-cassmeta', 'owm-cassmeta-init']
+
+- name: Search group check
+  set_fact:
+    is_search: true
+    group_id: 'searchcass'
+  when: groups[node_site+'-searchcass'] is defined and inventory_hostname in groups[node_site+'-searchcass']
+  tags: ['owm-cassmeta', 'owm-cassmeta-init']
+
+- name: Cassandra | Make sure the cassandra dependencies are installed
+  yum: name=pkgconfig state=latest
+  tags: ['owm-cassmeta']
+
+- name: Check the number of nodes
+  set_fact:
+     num_cass_meta_node: '{{ groups[node_site + "-" + group_id] | length }}'
+  tags: ['owm-cassmeta', 'owm-cassmeta-init']
+  
+- name: Calculate initial token value
+  shell: "python -c 'for i in range({{ num_cass_meta_node }}): print (((2**64 /{{ num_cass_meta_node }}) * i) - 2**63)'&& python -c 'for i in range({{ num_cass_meta_node }}): print (((2**64 /{{ num_cass_meta_node }}) * i) - 2**63) + 100'"
+  register: initial_token_values
+  tags: ['owm-cassmeta', 'owm-cassmeta-init']
+  check_mode: no 
+
+- name: Create initial token list
+  set_fact:
+     cassandra_initial_token: "{{ initial_token_values.stdout.split('\n') | list }}"
+  tags: ['owm-cassmeta', 'owm-cassmeta-init']
+
+- name: Cassandra | Download the Cassandra source release if not yet present
+  get_url:
+    url: "{{owm_tar_url}}/apache-cassandra-{{cassandra_source_version}}-bin.tar.gz"
+    dest: "/root/apache-cassandra-{{cassandra_source_version}}-bin.tar.gz"
+  tags: ['owm-cassmeta']
+
+- name: Cassandra | Install jna.jar Package
+  yum: name=jna* state=latest
+  tags: ['owm-cassblob']
+
+- name: Cassandra | create of meta directory
+  file:
+    path: "{{cass_user[0].home}}/cassandra-meta"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    mode: 0755
+    state: directory
+  tags: ['owm-cassmeta']
+
+- name: Cassandra | unarchive cassandra binaries
+  unarchive: src=/root/apache-cassandra-{{cassandra_source_version}}-bin.tar.gz dest={{cass_user[0].home}}/cassandra-meta copy=no
+  tags: ['owm-cassmeta']
+
+- name: Cassandra | Create the jna.jar symbolic link
+  action: file state=link src=/usr/share/java/jna.jar dest={{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/lib/jna.jar
+  ignore_errors: true
+  tags: ['owm-cassmeta']
+
+- include: cassandra_metrics.yml
+  when: "hostvars[groups['{{node_site}}-monitorui'][0]]['ansible_ssh_host'] is defined"
+  tags: ['owm-cassmeta', 'owm-cassmeta-metrics']
+
+- include: cassandra_conf_files_update.yml
+  tags: ['owm-cassmeta', 'owm-cassmeta-confupdates' ]
+
+- name: Cassandra | Change owner and groups of all Cassandra directories
+  file:
+    path: "{{cass_user[0].home}}"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    recurse: yes
+    state: directory
+  tags: ['owm-cassmeta']
+
+- name: Cassandra | Change owner and groups of Cassandra data file directory
+  file:
+    path: "{{item}}"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    recurse: yes
+    state: directory
+  when: data_file_directories is defined
+  with_items: "{{data_file_directories}}"
+  tags: ['owm-cassmeta']
+
+- name: Cassandra | Change owner and groups of Cassandra commit log directory
+  file:
+    path: "{{commitlog_directory}}"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    recurse: yes
+    state: directory
+  when: commitlog_directory is defined
+  tags: ['owm-cassmeta']
+
+- name: Cassandra | Change owner and groups of Cassandra saved caches directory
+  file:
+    path: "{{saved_caches_directory}}"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    recurse: yes
+    state: directory
+  when: saved_caches_directory is defined
+  tags: ['owm-cassmeta']
+
+- name: Create the symbolic link for cassandra home directory
+  file:
+    src: "{{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}"
+    dest: "{{cass_user[0].home}}/cassandra-meta/cassandra"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    state: link
+  tags: ['owm-cassmeta']
+
+- include: centos6.yml
+  when: (ansible_distribution == "CentOS" and ansible_distribution_major_version == "6") or 
+        (ansible_distribution == "RedHat" and ansible_distribution_major_version == "6")
+  tags: [ 'owm-cassmeta', 'startup-script' ]
+
+- include: centos7.yml
+  when: (ansible_distribution == "CentOS" and ansible_distribution_major_version == "7") or 
+        (ansible_distribution == "RedHat" and ansible_distribution_major_version == "7")
+  tags: [ 'owm-cassmeta', 'startup-script' ]
+
+- include: load_schema.yml
+  tags: ['owm-cassmeta', 'owm-cassmeta-loadschema']
+
+- include: cassmeta_maintenance.yml
+  when: cass_maintenance
+  tags: [ 'owm-cassmeta','maintenance' ]

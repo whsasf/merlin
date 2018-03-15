@@ -1,0 +1,10 @@
+---
+- hosts: cassmeta
+  vars:
+      initiate: 1
+  roles:
+    - common
+    - jdk
+    - owm-cassmeta
+# Monitor UI is now a separate component that installs the agents it needs
+#    - owm-logstash-shipper

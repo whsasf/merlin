@@ -1,0 +1,8 @@
+---
+- hosts: pabcal
+  serial: 1
+  roles:
+    - common
+    - owm-common
+    - owm-pab
+    - owm-cal

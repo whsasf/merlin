@@ -1,0 +1,29 @@
+---
+# NMAP Security Server
+- set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-nmap' ]
+
+- name: Install the latest version of nmap security tool
+  yum: name=nmap state=latest
+  tags: [ 'owm-nmap' ]
+
+# NMAP Security Client
+
+- set_fact:
+     target_hosts:  |
+        {% set space = joiner(" ") %}
+        {% for item in groups[node_site] -%}
+            {{ space() }}{{item}}
+        {%- endfor %}
+  tags: [ 'owm-nmap' ]
+
+- name: Create the Scan report directory
+  file: path=/opt/merlin/nmap state=directory
+  tags: [ 'owm-nmap' ]
+
+- name: Scan the hosts
+  shell: 'nmap -v -sT -P0 -F -sU -O -oA {{nmap_report_file_name}} {{target_hosts}}'
+  tags: [ 'owm-nmap' ]

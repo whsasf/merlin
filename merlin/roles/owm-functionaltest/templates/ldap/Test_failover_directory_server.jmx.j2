@@ -1,0 +1,1024 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="2.8" jmeter="2.13 r1665067">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments">
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is defined %}
+          <elementProp name="g_PrimaryDirServerName" elementType="Argument">
+             <stringProp name="Argument.name">g_PrimaryDirServerName</stringProp>
+             <stringProp name="Argument.value">{{ host }}</stringProp>        
+	     <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is not defined and loop.index < 3 %}
+          <elementProp name="g_SecondaryDirServerName" elementType="Argument">
+            <stringProp name="Argument.name">g_SecondaryDirServerName</stringProp>
+            <stringProp name="Argument.value">{{ host }}</stringProp>        
+	    <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+{% endif %}
+{% endfor %}
+{% endif %}
+          <elementProp name="g_imailUser" elementType="Argument">
+            <stringProp name="Argument.name">g_imailUser</stringProp>
+            <stringProp name="Argument.value">{{ emailmx_user[0].username }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+           <elementProp name="g_imailHome" elementType="Argument">
+            <stringProp name="Argument.name">g_imailHome</stringProp>
+            <stringProp name="Argument.value">{{ emailmx_user[0].home }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Testing Failover Between Directory Server " enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1443604842000</longProp>
+        <longProp name="ThreadGroup.end_time">1443604842000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data Set Config" enabled="true">
+          <stringProp name="filename">/opt/merlin/jmeter/tests/ldap/ldap_user_add.txt</stringProp>
+          <stringProp name="fileEncoding"></stringProp>
+          <stringProp name="variableNames">username,Id</stringProp>
+          <stringProp name="delimiter">,</stringProp>
+          <boolProp name="quotedData">false</boolProp>
+          <boolProp name="recycle">true</boolProp>
+          <boolProp name="stopThread">false</boolProp>
+          <stringProp name="shareMode">shareMode.all</stringProp>
+        </CSVDataSet>
+        <hashTree/>
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is defined %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Stop Primary Directory Server" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_PrimaryDirServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_imailUser} -c &apos;${g_imailHome}/lib/imservctrl kill imdirserv; imservping&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is not defined and loop.index < 3 %}
+      <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Stop Secondary Directory Server" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_SecondaryDirServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_imailUser} -c &apos;${g_imailHome}/lib/imservctrl kill imdirserv; imservping&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+	<hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is defined %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Change Configuration Key of Primary Directory Host" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_PrimaryDirServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_imailUser} -c &apos;${g_imailHome}/bin/imconfcontrol -install -key /${g_PrimaryDirServerName}/imdirserv/masterServerRole=2&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is defined %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Change Configuration Key of Secondary Directory Host" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_PrimaryDirServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_imailUser} -c &apos;${g_imailHome}/bin/imconfcontrol -install -key /${g_SecondaryDirServerName}/imdirserv/masterServerRole=1&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is defined %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Change Configuration Key of ldapMasterHost" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_PrimaryDirServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_imailUser} -c &apos;${g_imailHome}/bin/imconfcontrol -install -key /*/common/ldapMasterHosts=${g_SecondaryDirServerName}&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is defined %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Start Primary Directory Server" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_PrimaryDirServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_imailUser} -c &apos;${g_imailHome}/lib/imservctrl start imdirserv; imservping&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is not defined and loop.index < 3 %}
+      <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Start Secondary Directory Server" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_SecondaryDirServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_imailUser} -c &apos;${g_imailHome}/lib/imservctrl start imdirserv; imservping&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="Bind Primary Server" enabled="true">
+          <stringProp name="servername">${g_SecondaryDirServerName}</stringProp>
+          <stringProp name="port">5005</stringProp>
+          <stringProp name="rootdn"></stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">false</stringProp>
+          <stringProp name="deref_aliases">false</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">false</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn">cn=root</stringProp>
+          <stringProp name="user_pw">secret</stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">bind</stringProp>
+        </LDAPExtSampler>
+        <hashTree/>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="Add" enabled="true">
+          <stringProp name="servername"></stringProp>
+          <stringProp name="port"></stringProp>
+          <stringProp name="rootdn"></stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">false</stringProp>
+          <stringProp name="deref_aliases">false</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">false</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn"></stringProp>
+          <stringProp name="user_pw"></stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">add</stringProp>
+          <stringProp name="base_entry_dn">mail=${username}@{{domain_name}}</stringProp>
+          <elementProp name="arguments" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="adminpolicydn" elementType="Argument">
+                <stringProp name="Argument.name">adminpolicydn</stringProp>
+                <stringProp name="Argument.value">cn=default,cn=admin root</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="cn" elementType="Argument">
+                <stringProp name="Argument.name">cn</stringProp>
+                <stringProp name="Argument.value">${username}@{{domain_name}}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mail" elementType="Argument">
+                <stringProp name="Argument.name">mail</stringProp>
+                <stringProp name="Argument.value">${username}@{{domain_name}}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailautoreplyhost" elementType="Argument">
+                <stringProp name="Argument.name">mailautoreplyhost</stringProp>
+                <stringProp name="Argument.value">dualnode</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailboxid" elementType="Argument">
+                <stringProp name="Argument.name">mailboxid</stringProp>
+                <stringProp name="Argument.value">${Id}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailboxstatus" elementType="Argument">
+                <stringProp name="Argument.name">mailboxstatus</stringProp>
+                <stringProp name="Argument.value">A</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="maillogin" elementType="Argument">
+                <stringProp name="Argument.name">maillogin</stringProp>
+                <stringProp name="Argument.value">${username}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailmessagestore" elementType="Argument">
+                <stringProp name="Argument.name">mailmessagestore</stringProp>
+                <stringProp name="Argument.value">dualnode</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailpassword" elementType="Argument">
+                <stringProp name="Argument.name">mailpassword</stringProp>
+                <stringProp name="Argument.value">${username}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailpasswordtype" elementType="Argument">
+                <stringProp name="Argument.name">mailpasswordtype</stringProp>
+                <stringProp name="Argument.value">C</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">msgUser</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">msgUserPrefs</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">person</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">top</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">mailUser</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">mailLocalUserPrefs</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">mailUserPrefs</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="sn" elementType="Argument">
+                <stringProp name="Argument.name">sn</stringProp>
+                <stringProp name="Argument.value">${username}@{{domain_name}}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </LDAPExtSampler>
+        <hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+            <stringProp name="ConstantTimer.delay">60000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+        </hashTree>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="Unbind" enabled="true">
+          <stringProp name="servername">${g_SecondaryDirServerName)</stringProp>
+          <stringProp name="port">5005</stringProp>
+          <stringProp name="rootdn"></stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">false</stringProp>
+          <stringProp name="deref_aliases">false</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">false</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn">cn=root</stringProp>
+          <stringProp name="user_pw">secret</stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">unbind</stringProp>
+        </LDAPExtSampler>
+        <hashTree/>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="Bind Secondary Server" enabled="true">
+          <stringProp name="servername">${g_PrimaryDirServerName}</stringProp>
+          <stringProp name="port">5006</stringProp>
+          <stringProp name="rootdn"></stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">false</stringProp>
+          <stringProp name="deref_aliases">false</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">false</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn">cn=root</stringProp>
+          <stringProp name="user_pw">secret</stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">bind</stringProp>
+        </LDAPExtSampler>
+        <hashTree/>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="Search Added User" enabled="true">
+          <stringProp name="servername"></stringProp>
+          <stringProp name="port"></stringProp>
+          <stringProp name="rootdn"></stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">true</stringProp>
+          <stringProp name="deref_aliases">true</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">true</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn"></stringProp>
+          <stringProp name="user_pw"></stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">search</stringProp>
+          <stringProp name="search"></stringProp>
+          <stringProp name="searchfilter">mail=${username}@{{domain_name}}</stringProp>
+        </LDAPExtSampler>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="1390690827">&lt;cn&gt;${username}@owmessaging&lt;/cn&gt;</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">2</intProp>
+            <stringProp name="Assertion.scope">children</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is not defined and loop.index < 3 %}
+      <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check Servers are in sync" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_SecondaryDirServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_imailUser} -c &apos;${g_imailHome}/lib/imdirrcstatusrpt  | egrep Server Host|Master Server Role|lastchangenumber&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is defined %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Change Configuration Key of Primary Directory Host" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_PrimaryDirServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_imailUser} -c &apos;${g_imailHome}/bin/imconfcontrol -install -key /${g_PrimaryDirServerName}/imdirserv/masterServerRole=1&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+		<BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Change Configuration Key of Secondary Directory Host" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_PrimaryDirServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_imailUser} -c &apos;${g_imailHome}/bin/imconfcontrol -install -key /${g_SecondaryDirServerName}/imdirserv/masterServerRole=2&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+		<BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Change Configuration Key of ldapMasterHost" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_PrimaryDirServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_imailUser} -c &apos;${g_imailHome}/bin/imconfcontrol -install -key /*/common/ldapMasterHosts=${g_PrimaryDirServerName}&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>false</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

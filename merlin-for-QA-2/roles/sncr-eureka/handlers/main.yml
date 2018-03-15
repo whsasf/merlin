@@ -1,0 +1,6 @@
+---
+- name: Restart Eureka sncr-registry
+  service:
+    name: sncr-registry
+    state: restarted
+  tags: [ 'sncr-eureka','eureka' ]

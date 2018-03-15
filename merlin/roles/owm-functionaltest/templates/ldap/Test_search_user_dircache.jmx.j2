@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="2.8" jmeter="2.13 r1665067">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Search a user on Directory Cache Server" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1439283646000</longProp>
+        <longProp name="ThreadGroup.end_time">1439283646000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <Arguments guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <collectionProp name="Arguments.arguments">
+            <elementProp name="g_Dircache_HostName" elementType="Argument">
+              <stringProp name="Argument.name">g_Dircache_HostName</stringProp>
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is defined %}
+              <stringProp name="Argument.value">{{ host }}</stringProp>        
+{% endif %}
+{% endfor %}
+{% endif %}
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_Ldap_Port" elementType="Argument">
+              <stringProp name="Argument.name">g_Ldap_Port</stringProp>
+              <stringProp name="Argument.value">5006</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_Bind_DN" elementType="Argument">
+              <stringProp name="Argument.name">g_Bind_DN</stringProp>
+              <stringProp name="Argument.value">{{ jmeter_ldap[0].ldap_username }}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_Bind_Password" elementType="Argument">
+              <stringProp name="Argument.name">g_Bind_Password</stringProp>
+              <stringProp name="Argument.value">{{ jmeter_ldap[0].ldap_password }}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_Useradd" elementType="Argument">
+              <stringProp name="Argument.name">g_Useradd</stringProp>
+              <stringProp name="Argument.value">{{ jmeter_ldap[0].ldap_user }}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_UserPassword" elementType="Argument">
+              <stringProp name="Argument.name">g_UserPassword</stringProp>
+              <stringProp name="Argument.value">{{ jmeter_ldap[0].ldap_user_password }}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_Mailboxid" elementType="Argument">
+              <stringProp name="Argument.name">g_Mailboxid</stringProp>
+              <stringProp name="Argument.value">{{ 1000 | random }}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_DomainName" elementType="Argument">
+              <stringProp name="Argument.name">g_DomainName</stringProp>
+	      {% set domain = jmeter_ldap[0].ldap_domain_name.split('.') %}
+              <stringProp name="Argument.value">{{ domain[0] }}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_DirCache_Name" elementType="Argument">
+              <stringProp name="Argument.name">g_DirCache_Name</stringProp>
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is defined %}
+              <stringProp name="Argument.value">{{ host }}</stringProp>        
+{% endif %}
+{% endfor %}
+{% endif %}
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_Ldap_DirCache_Port" elementType="Argument">
+              <stringProp name="Argument.name">g_Ldap_DirCache_Port</stringProp>
+              <stringProp name="Argument.value">389</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </Arguments>
+        <hashTree/>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="LDAP Primary Master Bind" enabled="true">
+          <stringProp name="servername">${g_Dircache_HostName}</stringProp>
+          <stringProp name="port">${g_Ldap_Port}</stringProp>
+          <stringProp name="rootdn">dc=${g_DomainName},dc=com</stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">false</stringProp>
+          <stringProp name="deref_aliases">false</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">false</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn">cn=${g_Bind_DN}</stringProp>
+          <stringProp name="user_pw">${g_Bind_Password}</stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">bind</stringProp>
+        </LDAPExtSampler>
+        <hashTree/>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="Add User" enabled="true">
+          <stringProp name="servername"></stringProp>
+          <stringProp name="port"></stringProp>
+          <stringProp name="rootdn"></stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">false</stringProp>
+          <stringProp name="deref_aliases">false</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">false</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn"></stringProp>
+          <stringProp name="user_pw"></stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">add</stringProp>
+          <stringProp name="base_entry_dn">mail=${g_Useradd}</stringProp>
+          <elementProp name="arguments" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="sn" elementType="Argument">
+                <stringProp name="Argument.name">sn</stringProp>
+                <stringProp name="Argument.value">${g_Useradd}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="cn" elementType="Argument">
+                <stringProp name="Argument.name">cn</stringProp>
+                <stringProp name="Argument.value">${g_Useradd}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">top</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">person</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">mailuser</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">mailuserprefs</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">msguserprefs</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">maillocaluserprefs</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">msguser</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">netmailuser</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">senderscontrol</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">pabuser</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">pabuserprefs</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">caluser</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">caluserprefs</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="objectclass" elementType="Argument">
+                <stringProp name="Argument.name">objectclass</stringProp>
+                <stringProp name="Argument.value">smsuserprefs</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailpassword" elementType="Argument">
+                <stringProp name="Argument.name">mailpassword</stringProp>
+                <stringProp name="Argument.value">${g_UserPassword}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailboxstatus" elementType="Argument">
+                <stringProp name="Argument.name">mailboxstatus</stringProp>
+                <stringProp name="Argument.value">A</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="adminpolicydn" elementType="Argument">
+                <stringProp name="Argument.name">adminpolicydn</stringProp>
+                <stringProp name="Argument.value">cn=default,cn=admin root</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailmessagestore" elementType="Argument">
+                <stringProp name="Argument.name">mailmessagestore</stringProp>
+                <stringProp name="Argument.value">affinity03</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailpasswordtype" elementType="Argument">
+                <stringProp name="Argument.name">mailpasswordtype</stringProp>
+                <stringProp name="Argument.value">C</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailboxid" elementType="Argument">
+                <stringProp name="Argument.name">mailboxid</stringProp>
+                <stringProp name="Argument.value">${g_Mailboxid}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="maillogin" elementType="Argument">
+                <stringProp name="Argument.name">maillogin</stringProp>
+                <stringProp name="Argument.value">${g_UserPassword}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mail" elementType="Argument">
+                <stringProp name="Argument.name">mail</stringProp>
+                <stringProp name="Argument.value">${g_Useradd}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="mailautoreplyhost" elementType="Argument">
+                <stringProp name="Argument.name">mailautoreplyhost</stringProp>
+                <stringProp name="Argument.value">affinity03</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </LDAPExtSampler>
+        <hashTree/>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="LDAP Unbind" enabled="true">
+          <stringProp name="servername">${g_Dircache_HostName}</stringProp>
+          <stringProp name="port">${g_Ldap_Port}</stringProp>
+          <stringProp name="rootdn">dc=${g_DomainName},dc=com</stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">false</stringProp>
+          <stringProp name="deref_aliases">false</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">false</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn">cn=${g_Bind_DN}</stringProp>
+          <stringProp name="user_pw">${g_Bind_Password}</stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">unbind</stringProp>
+        </LDAPExtSampler>
+        <hashTree/>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="LDAP Directory Cache Server Bind" enabled="true">
+          <stringProp name="servername">${g_DirCache_Name}</stringProp>
+          <stringProp name="port">${g_Ldap_DirCache_Port}</stringProp>
+          <stringProp name="rootdn">dc=${g_DomainName},dc=com</stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">false</stringProp>
+          <stringProp name="deref_aliases">false</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">false</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn">cn=${g_Bind_DN}</stringProp>
+          <stringProp name="user_pw">${g_Bind_Password}</stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">bind</stringProp>
+        </LDAPExtSampler>
+        <hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Sleep" enabled="true">
+            <stringProp name="ConstantTimer.delay">60000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+        </hashTree>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="Search request" enabled="true">
+          <stringProp name="servername"></stringProp>
+          <stringProp name="port"></stringProp>
+          <stringProp name="rootdn"></stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">true</stringProp>
+          <stringProp name="deref_aliases">true</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">true</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn"></stringProp>
+          <stringProp name="user_pw"></stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">search</stringProp>
+          <stringProp name="search"></stringProp>
+          <stringProp name="searchfilter">mail=${g_Useradd}</stringProp>
+        </LDAPExtSampler>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="-1521822541">&lt;cn&gt;${g_Useradd}&lt;/cn&gt;</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">2</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>true</xml>
+              <fieldNames>true</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename">Result</stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

@@ -1,0 +1,33 @@
+---
+- name: Install the required packages
+  yum: pkg={{ item }} state={{ rbldnsd_pkg_state }}
+  with_items: "{{ rbldnsd_pkgs }}"
+  tags: [ 'package', 'rbldnsd' ]
+
+- name: Copy the rbldnsd template file
+  template: src=rbldnsd.j2 dest=/etc/sysconfig/rbldnsd
+  notify:
+  - restart rbldnsd
+  tags: [ 'configuration', 'rbldnsd' ]
+
+- name: Touch data file if they do not exist
+  file: path=/var/lib/rbldnsd/{{ item }} state=touch
+  with_items:
+    - 'sbl'
+    - 'xbl'
+  tags: [ 'configuration', 'rbldnsd' ]
+
+- name: Copy Spamhaus cronjob
+  copy: src="spamhaus-sync.sh" dest="/var/lib/rbldnsd/spamhaus-sync.sh" mode=0755
+  tags: [ 'configuration', 'rbldnsd' ]
+
+- name: Create Spamhaus cronjob
+  cron: minute="20,55"
+        name="Spamhaus rsync schedule to pull sbl and xbl datafeeds, at *:20 and *:55"
+        user="root"
+        job="/var/lib/rbldnsd/spamhaus-sync.sh"
+  tags: [ 'configuration', 'rbldnsd' ]
+
+- name: Start/stop rbldnsd service
+  service: name={{ rbldnsd_service_name }} state={{ rbldnsd_service_state }} enabled={{ rbldnsd_service_enabled }} pattern='/rbldnsd'
+  tags: [ 'service', 'rbldnsd' ]

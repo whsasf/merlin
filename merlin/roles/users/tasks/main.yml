@@ -1,0 +1,81 @@
+---
+- name: Build user list
+  set_fact:
+    user_list: "{{ [] }}"
+    
+- name: Append users to add
+  set_fact:
+    user_list: "{{ user_list + users_to_add }}"
+  when: users_to_add is defined
+  
+- name: Append mx users
+  set_fact:
+    user_list: "{{ user_list + mx_users }}"
+  when: mx_users is defined
+  
+- name: Append cassandra users
+  set_fact:
+    user_list: "{{ user_list + cassandra_users }}"
+  when: cassandra_users is defined
+
+- name: Append qservice users
+  set_fact:
+    user_list: "{{ user_list + qservice_users }}"
+  when: qservice_users is defined
+
+- name: Append directory users
+  set_fact:
+    user_list: "{{ user_list + directory_users }}"
+  when: directory_users is defined
+
+- name: Append all users
+  set_fact:
+    user_list: "{{ user_list + all_users }}"
+  when: all_users is defined
+
+- debug:
+    msg: "Users are {{ user_list | unique }}"
+
+
+- name: Creating groups
+  group: name="{{ item }}"
+  with_items: "{{ user_groups_to_add }}"
+  tags: ['users', 'configuration']
+
+- name: Per-user group creation
+  group: name="{{ item.username }}" gid="{{ item.uid }}"
+  with_items: "{{ user_list | unique }}"
+  when: users_create_per_user_group
+  tags: ['users', 'configuration']
+
+- name: User creation
+  user:
+        name: "{{ item.username }}"
+        group: "{{ item.username if users_create_per_user_group else users_group }}"
+        groups: "{{ item.groups | join(',') }}"
+        shell: "{{ item.shell if item.shell is defined else users_default_shell }}"
+        home: "{{ item.home | default(omit) }}"
+        password: "{{ item.password if item.password is defined else '!' }}"
+        comment: "{{ item.name }}"
+        uid: "{{ item.uid }}"
+        createhome: "{{ 'yes' if users_create_homedirs else 'no' }}"
+  with_items: "{{ user_list | unique }}"
+  tags: ['users', 'configuration']
+
+- name: SSH keys
+  authorized_key: user="{{ item.0.username }}" key="{{ item.1 }}"
+  with_subelements:
+    - "{{ user_list | unique }}"
+    - ssh_key
+  tags: ['users', 'configuration']
+
+- name: Deleted user removal
+  user: name="{{ item.username }}" state=absent
+  with_items: "{{ users_to_delete }}"
+  tags: ['users', 'configuration']
+
+- name: Deleted per-user group removal
+  group: name="{{ item.username }}" state=absent
+  with_items: "{{ users_to_delete }}"
+  when: users_create_per_user_group
+  tags: ['users', 'configuration']

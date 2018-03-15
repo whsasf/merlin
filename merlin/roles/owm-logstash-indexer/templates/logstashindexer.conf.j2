@@ -1,0 +1,380 @@
+input {
+
+{% for host in groups[node_site+'-redis'] %}
+	redis {
+	    host => "{{hostvars[host]['ansible_ssh_host']}}"
+	    data_type => "list"
+	    key => "logstash"
+	    codec => json
+	  }
+{% endfor %}
+}
+
+filter {
+   if [type] == "mxosLog"  {
+        grok {
+			match => ["message", "%{DATE_EU:mOSLogDate}\s*%{TIME}\s*%{LOGLEVEL:severity}\s*\[.*\]\s*%{WORD:className}\:%{WORD:functionName}\:%{WORD:lineNumber}\s*-\s*%{GREEDYDATA:ExtraInfo}",
+			"message", "%{GREEDYDATA:mxosLogData}"]
+        }
+    }
+   else  if [type] == "mxosStat" {
+		grok{
+			match => ["message", "%{DATE_EU:mOSStatDate}\s*%{TIME:time}\s*\-\s*%{WORD:serviceName}\s*%{WORD:request}\s*%{GREEDYDATA:extraData}",
+			"message", "%{GREEDYDATA:mxosStatLogData}"]
+        }  
+    }
+   else if [type] == "cassandraData" {
+		grok {
+			match => ["message", "%{WORD:log_line}\s*\[%{DATA:code}\]\s*%{TIMESTAMP_ISO8601:cassDatadate}\s*%{DATA: filename}\s*\(line %{INT:line_number:int}\)\s*%{GREEDYDATA: extradata}",
+			"message", "%{GREEDYDATA:cassandraDatalogData}"]
+		}
+    }
+   else if [type] == "mtaPopImaptrace" {
+		grok{
+			match => ["message" , "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{INT:integerData1:int}-%{INT:integerData2:int}\s*%{HOSTNAME:hostname}\s*%{WORD:log_line}\s*%{INT:integerData3:int}\s*%{INT:integerData4:int}\s*%{INT:integerData5:int};\s*\[\]\s*%{GREEDYDATA:extradata}",
+			"message", "%{GREEDYDATA:mtaPopImaptraceLogData}"]
+		}
+		if [extradata] =~ /UserDataAdapter/ {
+			grok {
+				match => ["extradata", "UserDataAdapter=%{INT:UserDataAdapter:int}\s*%{GREEDYDATA:greedyid}"]
+			}
+		mutate{
+			remove_field => [ "extradata"] 
+		}
+		}
+	}
+   else if [type] == "mssTrace" {
+		grok {
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{INT:integerData1:int}-%{INT:integerData2:int}\s*%{HOSTNAME:hostname}\s*%{DATA:log_line}\s*%{INT:integerData3:int}\s*%{INT:integerData4:int}\s*%{INT:integerData5:int};\s*\[mbox=%{INT:mbox:int}\]\s*UserDataAdapter=%{INT:UserDataAdapter:int}\s*%{GREEDYDATA:extradata}",
+			"message", "%{GREEDYDATA:mssTraceLogData}"]
+		}
+	}
+   else if [type] == "queueManagerTrace" {
+		grok{
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{INT:integerData1:int}-%{INT:integerData2:int}\s*%{HOSTNAME:hostname}\s*%{WORD:log_line}\s*%{INT:integerData3:int}\s*%{INT:integerData4:int}\s*%{INT:integerData5:int};\s*\[\]\s*%{GREEDYDATA:extradata}",
+			"message", "%{GREEDYDATA:queueManagerTraceLogData}"]
+		}
+	}
+   else if [type] == "imextconfimservTrace" {
+		grok{
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{INT:integerData1:int}-%{INT:integerData2:int}\s*%{HOSTNAME:hostname}\s*%{WORD:log_line}\s*%{INT:integerData3:int}\s*%{INT:integerData4:int}\s*%{INT:integerData5:int};\s*\[\]\s*%{GREEDYDATA:extradata}",
+			"message", "%{GREEDYDATA:imextconfimservTraceLogData}"]
+		}
+	}
+   else if [type] == "mxStat" { 
+        grok { 
+			match => [ "message", "%{INT:mxStatDate:int} .* %{HOSTNAME:host} .*;%{WORD:statState}\(%{GREEDYDATA:code}\) %{GREEDYDATA:extraData}",
+			"message", "%{GREEDYDATA:mxStatsLogData}"] 
+   } 
+        if [extraData] !~ /\/.*\// { 
+            mutate { 
+                add_field => { "statValue" => "%{extraData}" } 
+                remove_field => [ "extraData" ] 
+            } 
+        } 
+    }
+   else if [type] == "chunkScality" {
+        grok { 
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{TIME}\s*%{WORD:logName}\s*.*\=%{BASE16NUM:id}\s*type\=\"%{WORD:logtype}\"\s*cmd\=\"%{WORD:cmd}\" %{GREEDYDATA:extradata}",
+			"message", "%{GREEDYDATA:chunkScalityLogData}"]
+		}
+        if [extradata] =~ /bizioname/ {
+			grok {
+				match => ["extradata", "bizioname\=\"%{WORD:bizioname}\"\s*id\=\"%{BASE16NUM:rawID}\" status\=\"%{WORD:status}\" elapsed\=\"%{WORD:elaspsedTime}\" dataread\=\"%{NUMBER:dataread}\""]
+			}
+        }
+        else {
+			grok {
+				match => ["extradata", "%{GREEDYDATA:greedyid}"]
+			}
+        }
+        mutate{
+            remove_field => [ "extradata"] 
+        }
+    }
+   else if [type] == "restapiScality" {
+			grok{
+				match => ["message","%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{TIME}\s*%{WORD:logName}\s*id\=%{BASE16NUM:id}\s*context\=\"%{WORD:context}\"\s*%{GREEDYDATA:extradata}"]
+			}
+		if [extradata] =~ /action/
+		{
+			grok {
+				match => ["extradata", "src\=\"%{IP:src}\"\s*action\=\"%{WORD:action}\"\s*bucketid\=\"%{DATA:bucketid}\"\s*bucketname\=\"%{WORD:bucketname}\"\s*objid\=\"%{DATA:objid}\"\s*objname\=\"%{DATA:objname}\"\s*userid\=\"%{DATA:userid}\"\s*username\=\"%{WORD:username}\"\s*%{GREEDYDATA:extradata}"]
+			}
+		}
+		else if [extradata] =~ /uri/
+		{
+			grok {
+				match => ["extradata", "cmd\=\"%{WORD:cmd}\"\s*src\=\"%{IP:src}\"\s*step\=\"%{WORD:step}\"\s*method\=\"%{WORD:method}\"\s*%{GREEDYDATA:extradata}"]
+			}
+		}
+		mutate{
+			remove_field => [ "extradata"] 
+		}
+	}
+  else if [type] == "netScriptScality" {
+		grok { 
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{TIME}\s*%{WORD:logName}\s*id\=%{BASE16NUM:id}\s*CLIENT\:\s*proto\s*%{QUOTEDSTRING:sessionData} %{GREEDYDATA:ipData}",
+			"message", "%{GREEDYDATA:netScriptScalityLogData}"]
+		}
+	}
+  else if [type] == "chordScality" {
+		grok{
+			match=> ["message","%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{TIME}\s*%{WORD:logName}\s*id\=%{BASE16NUM:id} %{GREEDYDATA:logData}",
+			"message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{TIME}\s*%{WORD:logName}\s*in_conf\=%{BASE16NUM:in_conf}\s*vnodeid\=%{NUMBER:vnodeid}\s*transacid\=%{NUMBER:transacid}\s*proxy\=%{WORD:proxy}%{GREEDYDATA:extra}",
+			"message", "%{GREEDYDATA:chordScalityLogData}"]
+		}
+		if [extra] =~ /status/ {
+			grok{
+				match => ["extra","status\=%{WORD:status}"]
+            }
+        }
+        mutate{
+            remove_field => [ "extra"] 
+        }
+    }
+  else if [type] == "pmScality" {
+		grok{
+			match => ["message","%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{TIME}\s*%{WORD:log_name}\s*id=%{BASE16NUM:id}\s*api:\s*%{WORD:api}\s*\(%{WORD:mode}\)\s*commitmask\=\"%{DATA:commitmask}\"\s*repository\=\"%{DATA:repository}\"\s*record_id\=\"%{DATA:record_id}\"\s*bizioname\=\"%{DATA:bizioname}\"\s*cur_concurrent_nbio\=\"%{INT:cur_concurrent_nbio:int}\"",
+			"message", "%{GREEDYDATA:pmScalityLogData}"]
+		}
+	}
+  else if [type] == "slistScality" {
+		grok{
+			match => ["message","%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{TIME:timestamp}\s*%{WORD:log_name}\s*id=%{BASE16NUM:id}\s*api\=\"%{WORD:api}\"\s*%{GREEDYDATA:extradata}",
+			"message", "%{GREEDYDATA:slistScalityLogData}"]
+		}
+		if [extradata] =~ /flags/ {
+			grok {
+				match => ["extradata", "flags\=\"%{WORD:flags}\""]
+			}
+		}
+		else {
+			grok {
+				match => ["extradata", "%{GREEDYDATA:greedyid}"]
+			}
+		}
+		mutate{
+			remove_field => [ "extradata"] 
+		}
+    }
+  else if [type] == "appsuiteLogs" {
+        grok{
+            match => ["message","%{TIMESTAMP_ISO8601}\s*%{LOGLEVEL:severity}\s*\[.*\]\s*%{GREEDYDATA:package}\(%{GREEDYDATA:fileName}\:%{INT:linenumber:int}\)%{GREEDYDATA:data}",
+			"message", "%{GREEDYDATA:appsuiteLogData}"]
+        }
+        if [data] =~/^$/{
+            mutate{
+                remove_field => [ "data"] 
+            }
+        }
+    }
+  else if [type] == "appsuiteStats" {
+		grok{
+			match => ["message", "%{TIMESTAMP_ISO8601:time}\s*%{LOGLEVEL:severity}\s*\[%{GREEDYDATA}\]\s*\-\s*%{GREEDYDATA:data}",
+			"message", "%{GREEDYDATA:appsuiteStatLogData}"]
+		}
+	}
+  else if [type] == "nginxAccess" {
+		grok{
+			match => ["message","%{IPORHOST:clientip}\s*-\s*-\s*\[%{HTTPDATE:timestamp}\]\s*\"%{WORD:verb}\s*%{URIPATHPARAM:request}\s*HTTP/%{NUMBER:httpversion}\"\s*%{NUMBER:response}\s*(?:%{NUMBER:bytes}|-)\s*(?:\"(?:%{URI:referrer}|-)\"|%{QS:referrer})\s*%{QS:agent}",
+"message", "%{IPORHOST:clientip}\s*-\s*-\s*\[%{HTTPDATE:timestamp}\]\s*\"\-\" %{INT:status:int}",
+			"message", "%{GREEDYDATA:nginxAccessLogData}"]
+		}
+    }
+  else if [type] == "nginxError" {
+		grok{
+			match => ["message", "%{YEAR}/%{MONTHNUM}/%{MONTHDAY}\s*%{TIME}\s*\[%{WORD:level}\]\s*(?<ProcessID>[0-9]*\#?[0-9]):\s*%{GREEDYDATA:logData}",
+			"message", "%{GREEDYDATA:nginxErrorLogData}"]
+		}
+    }
+  else if [type] == "nagios" {
+		grok{
+			match => ["message", "\[%{INT:IntegerData1:int}\]\s*%{GREEDYDATA:log}",
+			"message", "%{GREEDYDATA:nagiosLogData}"]
+		}
+    }
+  else if [type] == "pythonLog" {
+		grok{
+			match => ["message", "%{WORD:log_type}\s*\[%{YEAR}%{MONTHNUM}%{MONTHDAY}-%{TIME}\]\s*thr=%{INT:thr:int}\s*%{WORD:module}.%{WORD:method}:\s*%{GREEDYDATA:extradata}",
+			"message", "%{GREEDYDATA:pythonLogData}"]
+		}
+    }
+  else if [type] == "mxLog"  {
+		grok {
+			patterns_dir => "/opt/logstash/patterns"
+			match => { "message" => "%{MXLOG}"}
+		}
+		owm_mx_log {
+			source => "greedydata"
+			field_split => ":"
+		}
+		mutate {
+			remove_field => [ "greedydata" ]
+		}
+	}
+  else if [type] == "mySqldLogs" {
+		grok{
+			match => ["message", "(?<year>[0-9]{1,2})%{MONTHNUM:month}%{MONTHDAY:day}\s*%{TIME} \s*%{GREEDYDATA:mySQLDlogData}",
+			"message", "%{GREEDYDATA:appsuiteStatLogData}"]
+		}
+	}
+  else if [type] == "webtopLog" {
+                multiline {
+                        pattern => "^%{TIMESTAMP_ISO8601:timestamp}"
+                        negate => true
+                        what => "previous"
+                }
+                grok{
+                        match => ["message","%{TIMESTAMP_ISO8601:timestamp}\s*\((?<clientIP>[0-9.\s]*)\)\s*%{WORD:severity}\s*%{JAVACLASS:classname}\s*-\s*%{GREEDYDATA:extradata}"]
+                }
+   }
+  else  if [type] == "cma_agent" {
+		multiline {
+			pattern => "^%{YEAR}"
+			negate => true
+			what => "previous"
+		}
+		grok{
+			match => ["message","%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{HOUR}:%{MINUTE}:%{SECOND}\s*%{GREEDYDATA:cma_agent_rawinfo}\s%{LOGLEVEL:severity}\s*%{GREEDYDATA:cma_agent_extradata}"]
+		} 
+    }
+  else  if [type] == "cma_alert_store" {
+		grok{
+			match => ["message","%{NUMBER:timevalue}\s*VERSION=%{BASE16FLOAT:version}\s*%{GREEDYDATA:cma_alert_store_extradata}"]
+		}  
+    }
+  else  if [type] == "cma_audit" {
+		grok {
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{HOUR}:%{MINUTE}:%{SECOND}\s*%{GREEDYDATA:cma_audit_raw_data}\s%{IP: address}\s%{GREEDYDATA:cma_audit_extradata}"]
+		}
+		if [cma_audit_extradata] =~ /operation/
+		{
+			grok {
+				match => ["cma_audit_extradata", "service:\srgt\sname:\s%{WORD:rgt_name}\s*operation:\s%{GREEDYDATA:operation}"]
+			}
+			mutate{
+				remove_field => [ "cma_audit_extradata"] 
+			}
+		} 
+    }
+  else  if [type] == "cma_service_rgt" {
+		multiline {
+			pattern => "^%{YEAR}"
+			negate => true
+			what => "previous"
+		}
+		grok{
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{HOUR}:%{MINUTE}:%{SECOND}\s*%{GREEDYDATA:cma_service_rawinfo}\s%{LOGLEVEL:severity}\s*%{GREEDYDATA:cma_service_rgt_extradata}"]
+		}  
+    }
+  else  if [type] == "cma_system" {
+		multiline {
+			pattern => "^%{YEAR}"
+			negate => true
+			what => "previous"
+		}
+		grok{
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{HOUR}:%{MINUTE}:%{SECOND}\s*%{GREEDYDATA:cma_system_rawinfo}\s%{LOGLEVEL:severity}\s*%{JAVACLASS:classname}\s*%{GREEDYDATA:cma_system_extradata}"]
+		}  
+    }
+  else  if [type] == "cmc_audit" {
+		grok{
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{HOUR}:%{MINUTE}:%{SECOND}\s*(?<cmc_audit_raw_data>[0-9\-\s\[A-Za-z]*)]\s*(?<operation_type>[\sa-z]*)\s*:\s*(?<rg_username>[a-z_A-Z@]*)\s*address:\s*%{IP:address}\s*operation:\s*%{GREEDYDATA:operation}"]
+		}  
+    }
+  else  if [type] == "cmc_console" {
+		multiline {
+			pattern => "^%{YEAR}"
+			negate => true
+			what => "previous"
+		}
+		grok{
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{HOUR}:%{MINUTE}:%{SECOND}\s*%{GREEDYDATA:rawinfo}\s%{LOGLEVEL:severity}\s*%{GREEDYDATA:cmc_console_extradata}"]
+		}  
+    }
+  else  if [type] == "cmc_system" {
+		grok {
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{HOUR}:%{MINUTE}:%{SECOND}\s*%{GREEDYDATA:cmc_system_extradata}"]
+		}
+		if [cmc_system_extradata] =~ /STATS/
+		{
+			grok {
+				match => ["cmc_system_extradata", "%{WORD:word1}\s*%{WORD:word2}\s*%{WORD:word3}\s*%{LOGLEVEL:severity}\s*%{WORD:type}%{GREEDYDATA:cmc_system_rawdata}"]
+			}
+			mutate{
+				remove_field => [ "cmc_system_extradata"] 
+			}
+		}
+		else if [cmc_system_extradata] =~ /INFO/
+		{
+			grok {
+				match => ["cmc_system_extradata", "%{USERNAME:threadinfo}\s*%{LOGLEVEL:severity}\s*%{JAVACLASS:classname}%{GREEDYDATA:cmc_system_rawdata}"]
+			}
+			mutate{
+				remove_field => [ "cmc_system_extradata"] 
+			}
+		}
+		else if [cmc_system_extradata] =~ /ERROR/
+		{
+			grok {
+				match => ["cmc_system_extradata", "%{WORD:word1}\s*%{WORD:word2}\s*%{WORD:word3}\s*%{LOGLEVEL:severity}\s*%{JAVACLASS:classname}\s*-\s*(?<failcause>[[a-zA-Z\s_]]*)\s*%{GREEDYDATA:cmc_system_rawdata}"]
+			}
+			mutate{
+				remove_field => [ "cmc_system_extradata"] 
+			}
+		}  
+    }
+  else  if [type] == "cmc_webtop" {
+		multiline {
+			pattern => "^%{YEAR}"
+			negate => true
+			what => "previous"
+		}
+		grok{
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{HOUR}:%{MINUTE}:%{SECOND}\s*\((?<clientIP>[0-9.\s]*)\)\s*%{LOGLEVEL:severity}\s*%{JAVACLASS:classname}\s*-\s*%{GREEDYDATA:cmc_webtop_extradata}"]
+		}  
+    }
+  else  if [type] == "rg_counters" {
+		grok{
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{HOUR}:%{MINUTE}:%{SECOND}\s*(?<counters_raw_data>[0-9\-A-Z]*)\s*(?<counters_operation_type>[\-A-Z]*)\s*%{GREEDYDATA:rg_counters_extradata}"]
+		}  
+    }
+  else  if [type] == "rg_smtp" {
+		grok{
+			match => ["message", "%{YEAR}%{MONTHNUM}%{MONTHDAY}\s*%{HOUR}:%{MINUTE}:%{SECOND}\s*(?<counters_raw_data>[0-9\-A-Z]*)\s*(?<counters_operation_type>[\-A-Z]*)\s*%{GREEDYDATA:rg_smtp_extradata}"]
+		}  
+    }
+  else {
+		grok {
+			match => ["message", "%{GREEDYDATA:defaultLogline}"]
+		}
+	}
+}
+
+output {
+elasticsearch { host => [{% set elkhosts = node_site+'-elk' %}{% if groups[elkhosts] is defined %}{% for host in groups[elkhosts] %}"{{hostvars[host]['ansible_ssh_host']}}",{% endfor %}{% endif %}ENDOFLOOP ] port => "9200" protocol => "http" }
+{% if SET_EMAIL_ALERT == "true" %}
+if [severity] in {% set email_alert_paramslen = email_alert_params | length %}{% if email_alert_paramslen == 1 %}"{{email_alert_params[0]}}"{% elif email_alert_paramslen >= 1 %}{{email_alert_params}}{% endif %} {
+email {
+        from => "{{mailfrom}}"
+        subject => "Attention | %{severity} level alert"
+        to => "{{mailto}}"
+        via => "smtp"
+        htmlbody => "<h2>Below log line has been reported</h2><br/><br/><div
+        align='left'>%{message}</div>"
+        options => [
+               "smtpIporHost", "{{smtpporthost}}",
+               "port", "{{smtpport}}",
+               "domain", "{{maildomain}}",
+               "userName", "{{mailfrom}}",
+               "password", "{{mailfrom_password}}",
+               "authenticationType", "login",
+               "starttls", "true"
+       ]
+}
+}
+{% endif %}
+stdout { codec => rubydebug }
+}
+

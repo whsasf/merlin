@@ -1,0 +1,12 @@
+---
+logstash_main_version: 1.5
+logstash_sub_version: 4
+owm_mx_logstash_filter_version: 1.0.0
+SET_EMAIL_ALERT: "false"
+mailfrom: testemail@owmessaging.com
+mailto: testemail@owmessaging.com
+mailfrom_password: P@ssw0rd
+email_alert_params: ["Erro", "ERROR"]
+smtpporthost: smtp.office365.com
+smtpport: 587
+maildomain: smtp.office365.com

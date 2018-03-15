@@ -1,0 +1,9 @@
+#!/bin/bash
+#Create timestamp variable
+timestamp=$(date '+%Y%m%d_%H%M')
+#Take config.db file backup
+tar -cf {{emailmx_user[0].home}}/conf-server-{{inventory_hostname}}-$timestamp.tar.gz  -C {{emailmx_user[0].home}}/config config.db
+#Copy the conf server backup files into backup server
+rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{emailmx_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress {{emailmx_user[0].home}}/conf-server-{{inventory_hostname}}-$timestamp.tar.gz root@{{backupserver_ip_address}}:{{backup_server_path}}
+#Delete backup file from source machine after copying on backup server
+rm -rf {{emailmx_user[0].home}}/conf-server-{{inventory_hostname}}-$timestamp.tar.gz

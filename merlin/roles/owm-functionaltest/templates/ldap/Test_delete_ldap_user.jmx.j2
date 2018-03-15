@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="2.8" jmeter="2.13 r1665067">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Delete a user on master directory server" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1439283646000</longProp>
+        <longProp name="ThreadGroup.end_time">1439283646000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <Arguments guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+          <collectionProp name="Arguments.arguments">
+            <elementProp name="g_Primary_Dir_HostName" elementType="Argument">
+              <stringProp name="Argument.name">g_Primary_Dir_HostName</stringProp>
+{% if groups['directory'] is defined %}
+{% for host in groups[node_site + '-directory'] %}
+{% if hostvars[host]['primary'] is defined %}
+              <stringProp name="Argument.value">{{ host }}</stringProp>	        
+{% endif %}
+{% endfor %}
+{% endif %}
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_Ldap_Port" elementType="Argument">
+              <stringProp name="Argument.name">g_Ldap_Port</stringProp>
+              <stringProp name="Argument.value">5006</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_Bind_DN" elementType="Argument">
+              <stringProp name="Argument.name">g_Bind_DN</stringProp>
+              <stringProp name="Argument.value">{{ jmeter_ldap[0].ldap_username }}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_Bind_Password" elementType="Argument">
+              <stringProp name="Argument.name">g_Bind_Password</stringProp>
+              <stringProp name="Argument.value">{{ jmeter_ldap[0].ldap_password }}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_UserDelete" elementType="Argument">
+              <stringProp name="Argument.name">g_UserDelete</stringProp>
+              <stringProp name="Argument.value">{{ jmeter_ldap[0].ldap_user_modrdn }}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+            <elementProp name="g_DomainName" elementType="Argument">
+              <stringProp name="Argument.name">g_DomainName</stringProp>
+	      {% set domain = jmeter_ldap[0].ldap_domain_name.split('.') %}
+              <stringProp name="Argument.value">{{ domain[0] }}</stringProp>
+              <stringProp name="Argument.metadata">=</stringProp>
+            </elementProp>
+          </collectionProp>
+        </Arguments>
+        <hashTree/>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="LDAP Bind" enabled="true">
+          <stringProp name="servername">${g_Primary_Dir_HostName}</stringProp>
+          <stringProp name="port">${g_Ldap_Port}</stringProp>
+          <stringProp name="rootdn">dc=${g_DomainName},dc=com</stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">false</stringProp>
+          <stringProp name="deref_aliases">false</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">false</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn">cn=${g_Bind_DN}</stringProp>
+          <stringProp name="user_pw">${g_Bind_Password}</stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">bind</stringProp>
+        </LDAPExtSampler>
+        <hashTree/>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="Delete User" enabled="true">
+          <stringProp name="servername"></stringProp>
+          <stringProp name="port"></stringProp>
+          <stringProp name="rootdn"></stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">false</stringProp>
+          <stringProp name="deref_aliases">false</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">false</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn"></stringProp>
+          <stringProp name="user_pw"></stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">delete</stringProp>
+          <stringProp name="delete">mail=${g_UserDelete}</stringProp>
+        </LDAPExtSampler>
+        <hashTree/>
+        <LDAPExtSampler guiclass="LdapExtTestSamplerGui" testclass="LDAPExtSampler" testname="Search request" enabled="true">
+          <stringProp name="servername"></stringProp>
+          <stringProp name="port"></stringProp>
+          <stringProp name="rootdn"></stringProp>
+          <stringProp name="scope">2</stringProp>
+          <stringProp name="countlimit"></stringProp>
+          <stringProp name="timelimit"></stringProp>
+          <stringProp name="attributes"></stringProp>
+          <stringProp name="return_object">false</stringProp>
+          <stringProp name="deref_aliases">false</stringProp>
+          <stringProp name="connection_timeout"></stringProp>
+          <stringProp name="parseflag">false</stringProp>
+          <stringProp name="secure">false</stringProp>
+          <stringProp name="user_dn"></stringProp>
+          <stringProp name="user_pw"></stringProp>
+          <stringProp name="comparedn"></stringProp>
+          <stringProp name="comparefilt"></stringProp>
+          <stringProp name="modddn"></stringProp>
+          <stringProp name="newdn"></stringProp>
+          <stringProp name="test">search</stringProp>
+          <stringProp name="search"></stringProp>
+          <stringProp name="searchfilter">mail=${g_UserDelete}</stringProp>
+        </LDAPExtSampler>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="97196323">false</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">2</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>false</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

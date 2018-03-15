@@ -1,0 +1,124 @@
+---
+- name: Determine configuration server host
+  set_fact:
+      conf_server_name: "{{ hostvars[item]['inventory_hostname'] }}"
+  with_items: "{{ groups['directory'] }}"
+  when: "hostvars[item]['primary'] is defined"
+  tags: [ 'owm-dirserv','mx','package' ]
+
+- name:  Check if owm-sur-common is installed
+  command: rpm -q owm-sur-common
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  changed_when: no
+  tags: [ 'owm-dirserv','mx' ]
+  check_mode: no
+
+- name: Check owm-sur-master is installed
+  command: rpm -q owm-sur-master
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  tags: [ 'owm-dirserv','mx' ]
+  check_mode: no
+
+- name: Fresh Install owm-sur-master
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} CONFSERVHOST={{conf_server_name}} rpm -ivh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-sur-master-{{emailmx_version}}.el6.x86_64.rpm'
+  when: rpm_check.rc != 0
+  tags: [ 'owm-dirserv','mx' ]
+
+#
+# Handle Upgrade
+#
+
+- name: Set Package Name
+  set_fact: 
+    package_name: "owm-sur-master"
+  when: rpm_check.rc == 0
+  tags: [ 'owm-dirserv','mx' ]
+
+# Check specific version
+- name: Get version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-dirserv','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0
+  tags: [ 'owm-dirserv','mx' ]
+
+# See which version is higher or lower
+- name: Compare installed RPM version with expected version
+  shell: '/tmp/compare_versions.sh {{emailmx_version}} {{rpm_version.stdout}}'
+  register: version_comparison
+  ignore_errors: yes
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-dirserv','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "Keeping the existing {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0 and version_comparison.rc == 0
+  tags: [ 'owm-dirserv','mx' ]
+
+- name: Abort if DIRSERV for downgrade
+  meta: end_play
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  check_mode: no
+
+# Try to catch the case that user specified a RPM package that is not in the {{owm_repo_url}}
+- name: Ensure {{owm_repo_url}} contains {{ package_name }}-{{emailmx_version}} RPM
+  uri: 
+    url: "{{owm_repo_url}}/{{ package_name }}-{{emailmx_version}}.el6.x86_64.rpm"
+    method: GET
+    status_code: 200
+  register: rpmpkg_file
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  check_mode: no
+
+- debug: 
+     msg: "{{ package_name }}-{{emailmx_version}}.el6.x86_64.rpm is not found in {{owm_repo_url}}"
+  when: rpm_check.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+
+- name: Abort if the {{ package_name }}-{{emailmx_version}} RPM  is missing
+  meta: end_play
+  when: rpm_check.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+  check_mode: no
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name }} upgrade from {{rpm_version.stdout}} to {{emailmx_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1 
+
+- pause: seconds=30
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+
+- name: Stop DIRSERV server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl stop imdirserv'
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'owm-dirserv','mx' ]
+
+# If application is already installed, and is a lower version do an upgrade
+- name: Upgrade {{ package_name }} from {{rpm_version.stdout}} to {{emailmx_version}}
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} CONFSERVHOST={{conf_server_name}} rpm -Uvh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-sur-master-{{emailmx_version}}.el6.x86_64.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'owm-dirserv','mx' ]
+
+# Check specific version
+- name: Get new version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-dirserv','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (upgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'owm-dirserv','mx' ]

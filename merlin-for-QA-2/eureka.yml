@@ -1,0 +1,10 @@
+---
+- hosts: eureka
+  vars:
+      initiate: 4
+  serial: 1
+  roles:
+    - common
+    - jdk
+    - sncr-eureka
+

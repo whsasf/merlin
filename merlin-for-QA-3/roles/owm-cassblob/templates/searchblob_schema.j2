@@ -1,0 +1,43 @@
+// Part 1. Update the search keyspace
+// <KEYSPACE> Adjust keyspace name if not using default name 'search'
+//USE search;
+//ALTER TABLE buckets ADD blobKeyspace boolean;
+// Part 2. Create the blob search keyspace
+CREATE KEYSPACE IF NOT EXISTS search_blob 
+  WITH REPLICATION = {
+     'class' : 'NetworkTopologyStrategy', 
+{% set comma = joiner(",") %}
+{% for site in sites -%}
+      {{ comma() }}'{{site}}' : '{{blobreplicationfactor}}' 
+{%- endfor %}
+    }
+  AND DURABLE_WRITES = true;
+
+// <KEYSPACE> Adjust keyspace name if not using default name 'search_blob'
+USE search_blob;
+
+// Index Fragment table.
+// Fragments are partitioned by buckets, with bucket size kept under control via the buckets table
+// As bucket date might not be 100% accurate, the docDate is useful for service to verify the documents
+// actually match the time range, when specified.
+
+CREATE TABLE IndexFragments (
+    docType text,           // Type of document
+    userId varchar,         // User unique id (likely the mailbox id)
+    bucket int,             // Bucket
+    folderId varchar,       // Folder identifier
+    docId varchar,          // Document primary id
+    secondaryId varchar,    // Document secondary id
+    docDate bigint,         // Document date
+    size int,               // Fragment size (terms + positions), useful for mailbox maintenance, to avoid retrieving the blobs
+    version int,            // Version of indexed data - usefull to trigger re-indexation when analysis is modified
+    termsif blob,           // Terms index fragment
+    positionsif blob,       // Positions index fragment
+    PRIMARY KEY ((docType, userId, bucket), folderId, docId)
+) WITH CLUSTERING ORDER BY (folderId DESC, docId DESC)
+<<<<<<< HEAD
+    AND COMPACTION = { 'class' : 'LeveledCompactionStrategy' };
+
+=======
+    AND COMPACTION = { 'class' : 'LeveledCompactionStrategy' };
+>>>>>>> 962e4ac182cd5758eb15e8097d0ff59b03562f7f

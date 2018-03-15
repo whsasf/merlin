@@ -1,0 +1,9 @@
+#!/bin/bash
+{% set secondary_monitor_ip_address=[] %}
+{% for host in groups[node_site + '-lawfulintercept']  %}
+{% if hostvars[host]['primary'] is not defined  %}
+{% set _ = secondary_monitor_ip_address.append(hostvars[host]['ansible_ssh_host'])  %}
+{% endif  %}
+{% endfor  %}
+#Copy mos backup file into backup server
+rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{ li_home }}/rsync_transfer_keys/rsync_transfer.rsa" --progress {{ li_home }}/MonitoringTool-{{li_version}}-SNAPSHOT/monitorsFile.txt root@{{ secondary_monitor_ip_address[0] }}:{{ li_home }}/MonitoringTool-{{li_version}}-SNAPSHOT

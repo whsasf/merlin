@@ -1,0 +1,8 @@
+---
+- hosts: razorgate
+  serial: 1
+  roles:
+     - common
+     - jdk
+     - owm-common
+     - owm-razorgate

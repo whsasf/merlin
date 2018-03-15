@@ -1,0 +1,17 @@
+---
+# While installing conf servers on directory hosts in parallel,
+# It was not installed properly. So with 'serial', it installs the conf servers
+# directory hosts in a sequential order i.e first one node will be picked
+# and installed and then the second node.
+- hosts: directory
+  serial: 1
+  roles:
+    - common
+    - jdk
+    - owm-eureka
+    - owm-common
+    - owm-confserv
+    - owm-sur-common
+    - owm-dirserv
+# Monitor UI is now a separate component that installs the agents it needs
+#    - owm-logstash-shipper

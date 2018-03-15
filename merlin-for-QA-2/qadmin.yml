@@ -1,0 +1,15 @@
+---
+- hosts: confserv
+  serial: 1
+  roles:
+    - owm-queue-admin-configdb
+    
+- hosts: qadmin
+  vars:
+      initiate: 3
+  serial: 1
+  roles:
+    - common
+    - jdk
+    - owm-common
+    - owm-queue-admin

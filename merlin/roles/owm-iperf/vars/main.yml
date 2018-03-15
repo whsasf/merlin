@@ -1,0 +1,7 @@
+---
+# iperf server port to which a client will connect to.
+iperfserv_port: 10000
+# To test the bandwidth for UDP, the valid suffixes are 'm' and 'k'
+iperf_bandwidth_to_test: 10m
+iperf_tcp_report: iperf_tcp.txt
+iperf_udp_report: iperf_udp.txt

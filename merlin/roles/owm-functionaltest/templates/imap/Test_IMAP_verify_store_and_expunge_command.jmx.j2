@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="2.8" jmeter="2.13 r1665067">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <Arguments guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="g_SMTPServerName" elementType="Argument">
+            <stringProp name="Argument.name">g_SMTPServerName</stringProp>
+{% if groups['fep'] is defined %}
+{% for host in groups[node_site + '-fep'] %}
+{% if loop.index < 2 %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined and interface['vlan'] == "access" %}
+            <stringProp name="Argument.value">{{ host + "-" + access_suffix }}</stringProp>
+{% endif %}
+{% endfor %}
+{% endif %}        
+{% endif %}
+{% endfor %}
+{% endif %}
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_SmtpPort" elementType="Argument">
+            <stringProp name="Argument.name">g_SmtpPort</stringProp>
+            <stringProp name="Argument.value">25</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_AddressFrom" elementType="Argument">
+            <stringProp name="Argument.name">g_AddressFrom</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_imap[0].user1_emailId }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_AddressTo" elementType="Argument">
+            <stringProp name="Argument.name">g_AddressTo</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_imap[0].user2_emailId }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_message" elementType="Argument">
+            <stringProp name="Argument.name">g_message</stringProp>
+            <stringProp name="Argument.value">Hi i am testing Imap completely</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_IMAPServerName" elementType="Argument">
+            <stringProp name="Argument.name">g_IMAPServerName</stringProp>
+{% if groups['fep'] is defined %}
+{% for host in groups[node_site + '-fep'] %}
+{% if loop.index < 2 %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined and interface['vlan'] == "access" %}
+             <stringProp name="Argument.value">{{ host + "-" + access_suffix }}</stringProp>
+{% endif %}
+{% endfor %}
+{% endif %}        
+{% endif %}
+{% endfor %}
+{% endif %}
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_ImapPort" elementType="Argument">
+            <stringProp name="Argument.name">g_ImapPort</stringProp>
+            <stringProp name="Argument.value">143</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+	  <elementProp name="g_UserName" elementType="Argument">
+             <stringProp name="Argument.name">g_UserName</stringProp>
+             <stringProp name="Argument.value">{{ jmeter_imap[0].user2_username }}</stringProp>
+             <stringProp name="Argument.metadata">=</stringProp>
+           </elementProp>
+          <elementProp name="g_UserPass" elementType="Argument">
+            <stringProp name="Argument.name">g_UserPass</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_imap[0].user2_password }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </Arguments>
+      <hashTree/>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Send 10 Mesaages" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">10</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1444207071000</longProp>
+        <longProp name="ThreadGroup.end_time">1444207071000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <SmtpSampler guiclass="SmtpSamplerGui" testclass="SmtpSampler" testname="Send Mail" enabled="true">
+          <stringProp name="SMTPSampler.server">${g_SMTPServerName}</stringProp>
+          <stringProp name="SMTPSampler.serverPort">${g_SmtpPort}</stringProp>
+          <stringProp name="SMTPSampler.mailFrom">${g_AddressFrom}</stringProp>
+          <stringProp name="SMTPSampler.replyTo"></stringProp>
+          <stringProp name="SMTPSampler.receiverTo">${g_AddressTo}</stringProp>
+          <stringProp name="SMTPSampler.receiverCC"></stringProp>
+          <stringProp name="SMTPSampler.receiverBCC"></stringProp>
+          <stringProp name="SMTPSampler.subject">Test Mail</stringProp>
+          <stringProp name="SMTPSampler.suppressSubject">false</stringProp>
+          <stringProp name="SMTPSampler.include_timestamp">true</stringProp>
+          <stringProp name="SMTPSampler.message">${g_message}</stringProp>
+          <stringProp name="SMTPSampler.plainBody">true</stringProp>
+          <stringProp name="SMTPSampler.attachFile"></stringProp>
+          <stringProp name="SMTPSampler.useSSL">false</stringProp>
+          <stringProp name="SMTPSampler.useStartTLS">false</stringProp>
+          <stringProp name="SMTPSampler.trustAllCerts">false</stringProp>
+          <stringProp name="SMTPSampler.enforceStartTLS">false</stringProp>
+          <stringProp name="SMTPSampler.useLocalTrustStore">false</stringProp>
+          <stringProp name="SMTPSampler.trustStoreToUse"></stringProp>
+          <boolProp name="SMTPSampler.use_eml">false</boolProp>
+          <stringProp name="SMTPSampler.emlMessageToSend"></stringProp>
+          <stringProp name="SMTPSampler.useAuth">false</stringProp>
+          <stringProp name="SMTPSampler.password"></stringProp>
+          <stringProp name="SMTPSampler.username"></stringProp>
+          <stringProp name="SMTPSampler.messageSizeStatistics">false</stringProp>
+          <stringProp name="SMTPSampler.enableDebug">false</stringProp>
+          <collectionProp name="SMTPSampler.headerFields"/>
+        </SmtpSampler>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="-767305147">${g_message}</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">16</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Execute store and Expunge" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1444208113000</longProp>
+        <longProp name="ThreadGroup.end_time">1444208113000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+          <stringProp name="ConstantTimer.delay">30000</stringProp>
+        </ConstantTimer>
+        <hashTree/>
+        <TCPSampler guiclass="TCPSamplerGui" testclass="TCPSampler" testname="Execute store and Expunge" enabled="true">
+          <stringProp name="TCPSampler.server">${g_IMAPServerName}</stringProp>
+          <boolProp name="TCPSampler.reUseConnection">true</boolProp>
+          <stringProp name="TCPSampler.port">${g_ImapPort}</stringProp>
+          <boolProp name="TCPSampler.nodelay">false</boolProp>
+          <stringProp name="TCPSampler.timeout"></stringProp>
+          <stringProp name="TCPSampler.request">a login ${g_UserName} ${g_UserPass}
+a select inbox
+a store 1 +flags \deleted
+a expunge
+a select inbox
+a logout
+</stringProp>
+          <boolProp name="TCPSampler.closeConnection">true</boolProp>
+          <stringProp name="ConfigTestElement.username"></stringProp>
+          <stringProp name="ConfigTestElement.password"></stringProp>
+        </TCPSampler>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="1114917391">a OK LOGIN completed</stringProp>
+              <stringProp name="-529983800">a OK [READ-WRITE] SELECT completed</stringProp>
+              <stringProp name="-1642734201">a OK STORE completed</stringProp>
+              <stringProp name="817490767">* 1 EXPUNGE</stringProp>
+              <stringProp name="1516820218">a OK EXPUNGE completed</stringProp>
+              <stringProp name="2085334624">* OK [UNSEEN 1] First unseen message</stringProp>
+              <stringProp name="1833450170">a OK LOGOUT completed</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">16</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+      <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>false</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

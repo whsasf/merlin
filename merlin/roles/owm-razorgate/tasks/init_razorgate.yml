@@ -1,0 +1,73 @@
+- name: Check if razorgate is installed
+  command: rpm -q razorgate
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: true
+  changed_when: no
+  tags: ['owm-razorgate']
+  check_mode: no
+
+- name: Install the following dependencies are required before installing the RG
+  yum: name={{item.name}} state=present
+  with_items:
+       - { name: 'pam' }
+       - { name: 'nss-softokn-freebl' }
+       - { name: 'glibc' }
+       - { name: 'cracklib' }
+       - { name: 'db4' }
+       - { name: 'perl-Pod-Escapes' }
+       - { name: 'perl-Pod-Simple' }
+       - { name: 'perl-Module-Pluggable' }
+       - { name: 'perl-libs' }
+       - { name: 'perl-version' }
+       - { name: 'perl' }
+       - { name: 'perl-Net-Telnet' }
+       - { name: 'openssl' }
+       - { name: 'libselinux' }
+       - { name: 'openssl098e' }
+       - { name: 'bind-libs' }
+       - { name: 'bind-utils' }
+       - { name: 'lsof' }
+       - { name: 'nc' }
+  when: not ansible_check_mode and rpm_check.rc != 0
+  tags: ['owm-razorgate']
+
+- name: Get the JDK version
+  shell: java -version 2>&1 | awk '/version/ {print $3}' | egrep -o '[^\"]*'
+  register: JDK_VERSION
+  tags: ['owm-razorgate']
+
+- name: Set the MIRA_ROOT and Binding_Address in Profile
+  lineinfile: dest=/etc/environment line="{{item.line}}"
+  with_items:
+      - { line: 'JAVA_HOME=/usr/java/jdk{{JDK_VERSION.stdout}}' }
+      - { line: 'MIRA_ROOT=/opt/data/rg/mira' }
+      - { line: 'RAZORGATE_BIND_ADDRESS={{rgAccessHost}},127.0.0.1' } 
+  when: not ansible_check_mode
+  tags: ['owm-razorgate']
+
+- name: Restart machine
+  command: sleep 2 && shutdown -r now
+  async: 1
+  poll: 0
+  ignore_errors: true
+  when: not ansible_check_mode
+  tags: ['owm-razorgate']
+
+- name: Waiting for server to start
+  when: not ansible_check_mode
+  local_action: wait_for host={{ inventory_hostname }} state=started
+  
+- name: Check if exim is installed
+  command: rpm -q exim
+  register: exim_check
+  failed_when: exim_check.rc > 1
+  ignore_errors: true
+  changed_when: no
+  tags: ['owm-razorgate']
+
+- name: Stop exim Process
+  service: name=exim state=stopped enabled=no
+  when: not ansible_check_mode and exim_check.rc == 0 
+  tags: ['owm-razorgate']
+

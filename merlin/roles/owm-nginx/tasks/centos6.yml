@@ -1,0 +1,5 @@
+---
+- name: Start Nginx 
+  shell: "{{ nginx_home_dir }}/nginx_{{ item }}/nginx{{ owm_nginx_version }}/scripts/nginx start"
+  with_items: "{{ node_component }}"
+  tags: [ 'owm-affinity','owm-nginx', 'startup-script' ]

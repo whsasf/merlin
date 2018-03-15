@@ -1,0 +1,89 @@
+---
+- set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: ['owm-logstash-indexer']
+
+- name: Checking logstash installation
+  shell: rpm -qa | grep logstash
+  register: LG
+  failed_when: LG.rc > 1
+  ignore_errors: true
+  changed_when: no
+  tags: ['owm-logstash-indexer']
+
+- name: Initializing .repo file under /etc/yum.repos.d/
+  template:
+    src: "logstash.repo.j2"
+    dest: "/etc/yum.repos.d/logstash.repo"
+    owner: "root"
+    group: "root"
+    mode: 0644
+  when: LG.rc != 0
+  tags: ['owm-logstash-indexer']
+
+- name: Installing logstash... | It may take some time...
+  yum: name=logstash-{{logstash_main_version}}.{{logstash_sub_version}} state=present
+  when: LG.rc != 0
+  tags: ['owm-logstash-indexer']
+
+- name: Get owm-mx-log filter
+  get_url: url="{{owm_tar_url}}/logstash-filter-owm_mx_log-{{owm_mx_logstash_filter_version}}.gem" dest="/opt/logstash"
+  tags: ['owm-logstash-indexer']
+  
+- name: Installing owm-mx-log filter
+  shell: /opt/logstash/bin/plugin install /opt/logstash/logstash-filter-owm_mx_log-{{owm_mx_logstash_filter_version}}.gem
+  tags: ['owm-logstash-indexer']
+
+- name: Creating directory for patterns
+  file: path=/opt/logstash/patterns state=directory
+  tags: ['owm-logstash-indexer']
+
+- name: Installing Custom grok pattern for Mx
+  copy:
+    src: "mx"
+    dest: "/opt/logstash/patterns/mx"
+    mode: 0644
+  tags: ['owm-logstash-indexer']
+
+- name: Updating the logstashindexer.conf configuration file
+  template:
+    src: "logstashindexer.conf.j2"
+    dest: "/etc/logstash/conf.d/logstashindexer.conf"
+    owner: "root"
+    group: "root"
+    mode: 0644
+  tags: ['owm-logstash-indexer']
+  
+- name: Configuring conf file
+  lineinfile:
+    dest: /etc/logstash/conf.d/logstashindexer.conf
+    state: present
+    regexp: '^(.*),ENDOFLOOP(.*)$'
+    line: '\1 \2'
+    backrefs: yes
+    backup: yes
+  tags: ['owm-logstash-indexer']
+  
+- name: Enabling host a central syslogger
+  lineinfile:
+    dest: /etc/rsyslog.conf
+    state: present
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^#$ModLoad imudp', line: '$ModLoad imudp' }
+    - { regexp: '^#$UDPServerRun 514', line: '$UDPServerRun 514' }
+    - { regexp: '^#$ModLoad imtcp', line: '$ModLoad imtcp' }
+    - { regexp: '^#$InputTCPServerRun 514', line: '$InputTCPServerRun 514' }
+  tags: ['owm-logstash-indexer']
+  
+- name: Changing Logstash user to root
+  lineinfile: dest=/etc/sysconfig/logstash state=present regexp=^LS_USER=logstash line=LS_USER=root
+  tags: ['owm-logstash-indexer']
+  
+- name: Starting logstash
+  service: name=logstash state=started enabled=yes
+  tags: ['elkstart','owm-logstash-indexer']
+  

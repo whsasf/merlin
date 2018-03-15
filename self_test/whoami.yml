@@ -1,0 +1,8 @@
+---
+- name: show return value of command module
+  hosts: haha
+  tasks:
+    - name: capture output of id command
+      shell: id -un
+    - name: export PORTS_OFFSET=20000
+      shell: export PORTS_OFFSET=20000

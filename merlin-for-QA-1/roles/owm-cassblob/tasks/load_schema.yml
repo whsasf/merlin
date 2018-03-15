@@ -1,0 +1,29 @@
+---
+- pause: seconds=30
+  tags: ['owm-cassblob']
+
+- name: Cassandra | Load the blob schema on cassandra
+  template:
+    src: "{{item}}.j2"
+    dest: "{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/{{item}}"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    mode: 0644
+    backup: yes
+  with_items:
+    - "blob_schema"
+  tags: ['owm-cassblob', 'owm-cassblob-loadschema']
+
+- name: Check blob schema exists
+  shell: runuser -l {{cass_user[0].username}} -g {{cass_user[0].username}} -c '{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/bin/nodetool status KeyspaceBlobStore'
+  register: mssschema
+  failed_when: mssschema.rc == 0
+  ignore_errors: True
+  when: master is defined and "inventory_hostname in groups['{{node_site}}-{{group_id}}']"
+  tags: ['owm-cassmeta', 'owm-cassmeta-loadschema']
+
+- name: Cassandra | Apply blob schema on cassandra
+  shell: runuser -l {{cass_user[0].username}} -g {{cass_user[0].username}} -c 'nohup {{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/bin/cassandra-cli -host {% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == "service" %}{{ interface['address'] }}{% endif %}{% endfor %} -port {{cassandra_blob_rpc_port}} -f {{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/conf/blob_schema'
+  sudo: yes
+  when: master is defined and "inventory_hostname in groups['{{node_site}}-{{group_id}}']" and mssschema.rc > 0
+  tags: ['owm-cassblob', 'owm-cassblob-loadschema']

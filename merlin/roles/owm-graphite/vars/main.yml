@@ -1,0 +1,8 @@
+---
+
+graphite_user: graphite
+graphite_password: complexpassw0rd
+graphite_host: localhost
+graphite_database: graphite
+graphite_Install_path: /opt
+python_version: 2.6

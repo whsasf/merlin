@@ -1,0 +1,22 @@
+---
+- name: Verify Target is Primary Conf Server
+  set_fact:
+    proceed: true
+  with_items: "{{groups['confserv']}}"
+  when: "inventory_hostname == item and hostvars[inventory_hostname]['primary'] is defined"
+  tags: [ 'owm-queue-service-configdb' ]
+
+- name: Update ConfigDB for Queue Service
+  template:
+    src: "config-qservice.sh.j2"
+    dest: "/tmp/config-qservice.sh"
+    owner: "{{emailmx_user[0].username}}"
+    group: "{{emailmx_user[0].username}}"
+    mode: 0644
+  when: "proceed is defined"
+  tags: [ 'owm-queue-service-configdb' ]
+  
+- name: Run script config-qservice.sh
+  shell: "bash /tmp/config-qservice.sh"
+  when: "proceed is defined"
+  tags: [ 'owm-queue-service-configdb' ]

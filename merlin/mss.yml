@@ -1,0 +1,20 @@
+---
+# With Serial execution of this role sets the config key
+# groupDefinition correctly in config.db.
+- hosts: mss
+  serial: 1
+  roles:
+    - common
+    - jdk
+    - owm-common
+    - owm-msg-common
+    - owm-mss
+    - owm-platformtools
+# Monitor UI is now a separate component that installs the agents it needs
+#    - owm-logstash-shipper
+#    - owm-collectd
+
+- hosts: directory
+  serial: 1
+  roles:
+    - owm-mss-configdb

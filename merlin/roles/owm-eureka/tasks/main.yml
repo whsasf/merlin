@@ -1,0 +1,69 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-eureka','eureka']
+
+- name: Determine cluster name
+  set_fact:
+    node_cluster: "{{ item }}"
+  with_items: "{{ clusters }}"
+  when: hostvars[inventory_hostname]['clusterId'] is defined and hostvars[inventory_hostname]['clusterId'] == "{{ item }}"
+  tags: [ 'owm-eureka','eureka' ]
+
+- name: Check if owm-service-discovery is installed
+  command: rpm -q owm-service-discovery
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  tags: [ 'owm-eureka','eureka' ]
+  check_mode: no
+
+- debug: msg="owm-eureka Installing owm-service-discovery-{{eureka_version}}"
+
+- name: Install owm-service-discovery
+  yum: name=owm-service-discovery-{{eureka_version}} state=present
+  when: rpm_check.rc != 0
+  tags: [ 'owm-eureka','eureka' ]
+
+- debug: msg="owm-eureka eureka_port is {{eureka_port}}"
+- debug: msg="owm-eureka home directory is {{eureka_user[0].home}}"
+- debug: msg="owm-eureka user is  {{eureka_user[0].username}}"
+
+- name: Install and configure application.yml 
+  template:
+    src: "application.yml.j2"
+    dest: "{{eureka_user[0].home}}/service-discovery/config/application.yml"
+    owner: "{{eureka_user[0].username}}"
+    group: "{{eureka_user[0].username}}"
+    mode: 0755
+  tags: [ 'owm-eureka','eureka' ]
+
+- name: Create systemd service unit
+  template:
+    src: "service-discovery.service.j2"
+    dest: "/etc/systemd/system/service-discovery.service"
+    owner: "root"
+    mode: 0644
+  when: (ansible_distribution == "CentOS" and ansible_distribution_major_version == "7") or 
+        (ansible_distribution == "RedHat" and ansible_distribution_major_version == "7")
+  tags: [ 'owm-eureka', 'startup-script' ]
+
+- name: Create systemd service unit (daemon-reload)
+  shell: systemctl daemon-reload
+  sudo: yes
+  when: (ansible_distribution == "CentOS" and ansible_distribution_major_version == "7") or 
+        (ansible_distribution == "RedHat" and ansible_distribution_major_version == "7")
+  tags: [ 'owm-eureka', 'startup-script' ]
+
+- name: Stop Eureka service-discovery server
+  service: name=service-discovery state=stopped
+  ignore_errors: True
+  tags: [ 'owm-eureka','eureka' ]
+
+- name: Start Eureka service-discovery server
+  service: name=service-discovery state=started enabled=yes
+  tags: [ 'owm-eureka','eureka' ]

@@ -1,0 +1,82 @@
+1 all components and depended rpm packages :
+
+(1)service-discovery
+    owm-service-discovery-1.0.3-1.noarch.rpm
+(2)Platformtools
+    PlatformTools-1.0.33-8.rpm
+(3)confserver
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-confserv-9.6.0.0-169.el6.x86_64.rpm
+(4)IMAP
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-imapserv-9.6.0.0-169.el6.x86_64.rpm
+(5)POP
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-popserv-9.6.0.0-169.el6.x86_64.rpm
+(6)MTA
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-mta-9.6.0.0-169.el6.x86_64.rpm
+(7)MSS
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-mss-9.6.0.0-169.el6.x86_64.rpm
+(8)extserv
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-extserv-9.6.0.0-169.el6.x86_64.rpm
+(9)imqueue
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-qserv-9.6.0.0-169.el6.x86_64.rpm
+(10)dir-server
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-sur-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-sur-master-9.6.0.0-169.el6.x86_64.rpm
+(11)dir-cache
+     owm-common-9.6.0.0-169.el6.x86_64.rpm
+     owm-sur-common-9.6.0.0-169.el6.x86_64.rpm
+     owm-sur-cache-9.6.0.0-169.el6.x86_64.rpm
+(12)mOS
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-mxos-thirdparty-2.4.2.rpm
+    owm-mxos-2.4.13-2.rpm
+(13)pab
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-pab-9.6.000-0.el6.x86_64.rpm
+(14)cal
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-cal-9.6.000-0.el6.x86_64.rpm
+(15)queue-service
+    owm-queue-service-1.0.0.9-7.noarch.rpm
+(16)queue-admin
+    owm-queue-admin-1.0.0.9-7.noarch.rpm
+(17)queue-search
+    owm-queue-search-1.0.0.9-7.noarch.rpm
+(18)search-server
+    sncr-search-9.6.0-1.noarch.rpm
+
+
+    owm-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-confserv-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-extserv-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-imapserv-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-mss-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-mta-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-popserv-9.6.0.0-169.el6.x86_64.rpm
+    owm-msg-qserv-9.6.0.0-169.el6.x86_64.rpm
+    owm-sur-cache-9.6.0.0-169.el6.x86_64.rpm
+    owm-sur-common-9.6.0.0-169.el6.x86_64.rpm
+    owm-sur-master-9.6.0.0-169.el6.x86_64.rpm
+    owm-mxos-2.4.13-2.rpm
+    owm-mxos-thirdparty-2.4.2.rpm
+    owm-pab-9.6.000-0.el6.x86_64.rpm
+    owm-queue-admin-1.0.0.9-7.noarch.rpm
+    owm-queue-search-1.0.0.9-7.noarch.rpm
+    owm-queue-service-1.0.0.9-7.noarch.rpm
+    owm-service-discovery-1.0.3-1.noarch.rpm
+    PlatformTools-1.0.33-8.rpm
+    sncr-search-9.6.0-1.noarch.rpm

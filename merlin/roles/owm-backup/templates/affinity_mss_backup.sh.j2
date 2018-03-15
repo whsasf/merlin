@@ -1,0 +1,9 @@
+#!/bin/bash
+#Create timestamp variable
+timestamp=$(date '+%Y%m%d_%H%M')
+#Take mss affinity manager configuration file backup
+tar -cf {{nginx_home_dir}}/affinity-{{inventory_hostname}}-$timestamp.tar.gz -C {{nginx_home_dir}}/nginx_{{ item }}/nginx{{ owm_nginx_version }}/conf nginx.conf
+#Copy mss affinity manager backup file into backup server
+rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{nginx_home_dir}}/backup_transfer_keys/backup_transfer.rsa" --progress {{nginx_home_dir}}/affinity-{{inventory_hostname}}-$timestamp.tar.gz root@{{backupserver_ip_address}}:{{backup_server_path}}
+#Delete mss affinity manager backup file after copying on backup server
+rm -rf {{nginx_home_dir}}/affinity-{{inventory_hostname}}-$timestamp.tar.gz

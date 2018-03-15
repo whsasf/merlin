@@ -1,0 +1,26 @@
+#! /bin/bash
+
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -lockserver'
+
+{% for site in sites %}
+{%   if groups[site+'-affinity'] is defined %}
+{%     set site_clusters = [] %}
+{%     for host in groups[site+'-affinity'] %}
+{%       if hostvars[host]['component'] is defined %}
+{%         if hostvars[host]['component'] == 'mss' and hostvars[host]['clusterId'] is defined %}
+{%           set clusterHashEntry = hostvars[host]['clusterId']+'='+host+'-VIP:0-999' %}
+{%           set _ = site_clusters.append(clusterHashEntry) %}
+# MSS affinity - host {{ host }} - cluster {{ hostvars[host]['clusterId'] }} - site {{ site }}
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{site}}-{{hostvars[host]['clusterId']}}/common/clusterHashMap"="{{clusterHashEntry}}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{host}}-VIP/mss/mssBasePort"="{{mss_listening_port_proxy}}""'
+{%         endif %}
+{%       endif %}
+{%       if loop.last %}
+# site_clusters: {{ site_clusters }}
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{site}}/common/clusterHashMap"="{{site_clusters | join ('\\\\n') }}""'
+{%       endif %}
+{%     endfor %}
+{%   endif %}
+{% endfor %}
+
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -unlockserver'

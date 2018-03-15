@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="2.8" jmeter="2.13 r1665067">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments">
+{% if groups['smtpout'] is defined %}
+{% for host in groups[node_site + '-smtpout'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined and interface['vlan'] == "access" %}
+	<elementProp name="g_SmtpOutHostName" elementType="Argument">
+	   <stringProp name="Argument.name">g_SmtpOutHostName</stringProp>
+	   <stringProp name="Argument.value">{{ host + "-" + access_suffix }}</stringProp>
+	   <stringProp name="Argument.metadata">=</stringProp>
+	</elementProp>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['smtpin'] is defined %}
+{% for host in groups[node_site + '-smtpin'] %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined and interface['vlan'] == "access" %}
+	 <elementProp name="g_SmtpInHostName" elementType="Argument">
+	    <stringProp name="Argument.name">g_SmtpInHostName</stringProp>
+	    <stringProp name="Argument.value">{{ host + "-" + access_suffix }}</stringProp>
+	    <stringProp name="Argument.metadata">=</stringProp>
+	 </elementProp>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+            
+          <elementProp name="g_SmtpPort" elementType="Argument">
+            <stringProp name="Argument.name">g_SmtpPort</stringProp>
+            <stringProp name="Argument.value">25</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_AddressFrom" elementType="Argument">
+            <stringProp name="Argument.name">g_AddressFrom</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_rg[0].from_user_emailId }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_AddressTo" elementType="Argument">
+            <stringProp name="Argument.name">g_AddressTo</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_rg[0].to_user_emailId }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_ImailUser" elementType="Argument">
+            <stringProp name="Argument.name">g_ImailUser</stringProp>
+            <stringProp name="Argument.value">{{ emailmx_user[0].username }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_ImailPass" elementType="Argument">
+            <stringProp name="Argument.name">g_ImailPass</stringProp>
+            <stringProp name="Argument.value">{{ emailmx_user[0].username }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_Install_Path" elementType="Argument">
+            <stringProp name="Argument.name">g_Install_Path</stringProp>
+            <stringProp name="Argument.value">/opt/data/rg/mira</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Send Mail" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1447134992000</longProp>
+        <longProp name="ThreadGroup.end_time">1447134992000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+{% if groups['smtpout'] is defined %}
+{% for host in groups[node_site + '-smtpout'] %}
+        <SmtpSampler guiclass="SmtpSamplerGui" testclass="SmtpSampler" testname="Send Mail" enabled="true">
+          <stringProp name="SMTPSampler.server">${g_SmtpOutHostName}</stringProp>
+          <stringProp name="SMTPSampler.serverPort">${g_SmtpPort}</stringProp>
+          <stringProp name="SMTPSampler.mailFrom">${g_AddressFrom}</stringProp>
+          <stringProp name="SMTPSampler.replyTo"></stringProp>
+          <stringProp name="SMTPSampler.receiverTo">${g_AddressTo}</stringProp>
+          <stringProp name="SMTPSampler.receiverCC"></stringProp>
+          <stringProp name="SMTPSampler.receiverBCC"></stringProp>
+          <stringProp name="SMTPSampler.subject"></stringProp>
+          <stringProp name="SMTPSampler.suppressSubject">false</stringProp>
+          <stringProp name="SMTPSampler.include_timestamp">false</stringProp>
+          <stringProp name="SMTPSampler.message">Hi</stringProp>
+          <stringProp name="SMTPSampler.plainBody">false</stringProp>
+          <stringProp name="SMTPSampler.attachFile"></stringProp>
+          <stringProp name="SMTPSampler.useSSL">false</stringProp>
+          <stringProp name="SMTPSampler.useStartTLS">false</stringProp>
+          <stringProp name="SMTPSampler.trustAllCerts">false</stringProp>
+          <stringProp name="SMTPSampler.enforceStartTLS">false</stringProp>
+          <stringProp name="SMTPSampler.useLocalTrustStore">false</stringProp>
+          <stringProp name="SMTPSampler.trustStoreToUse"></stringProp>
+          <boolProp name="SMTPSampler.use_eml">false</boolProp>
+          <stringProp name="SMTPSampler.emlMessageToSend"></stringProp>
+          <stringProp name="SMTPSampler.useAuth">false</stringProp>
+          <stringProp name="SMTPSampler.password"></stringProp>
+          <stringProp name="SMTPSampler.username"></stringProp>
+          <stringProp name="SMTPSampler.messageSizeStatistics">false</stringProp>
+          <stringProp name="SMTPSampler.enableDebug">false</stringProp>
+          <collectionProp name="SMTPSampler.headerFields"/>
+        </SmtpSampler>
+        <hashTree/>
+        <org.apache.jmeter.protocol.ssh.sampler.SSHSampler guiclass="TestBeanGUI" testclass="org.apache.jmeter.protocol.ssh.sampler.SSHSampler" testname="Change the directory" enabled="true">
+          <stringProp name="command">cd ${g_Install_Path}/usr/store/logs/;ls -ltr</stringProp>
+          <stringProp name="hostname">${g_SmtpOutHostName}</stringProp>
+          <stringProp name="password">${g_ImailPass}</stringProp>
+          <intProp name="port">22</intProp>
+          <stringProp name="username">${g_ImailUser}</stringProp>
+        </org.apache.jmeter.protocol.ssh.sampler.SSHSampler>
+        <hashTree>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">res1</stringProp>
+            <stringProp name="RegexExtractor.regex">smtp-(.*?).log</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">error</stringProp>
+            <stringProp name="RegexExtractor.match_number">1</stringProp>
+          </RegexExtractor>
+          <hashTree/>
+        </hashTree>
+        <org.apache.jmeter.protocol.ssh.sampler.SSHSampler guiclass="TestBeanGUI" testclass="org.apache.jmeter.protocol.ssh.sampler.SSHSampler" testname="Check the Smtp Log" enabled="true">
+          <stringProp name="hostname">${g_SmtpOutHostName}</stringProp>
+          <intProp name="port">22</intProp>
+          <stringProp name="username">${g_ImailUser}</stringProp>
+          <stringProp name="password">${g_ImailPass}</stringProp>
+          <stringProp name="command">cat ${g_Install_Path}/usr/store/logs/${res1_g0}</stringProp>
+        </org.apache.jmeter.protocol.ssh.sampler.SSHSampler>
+        <hashTree/>
+{% endfor %}
+{% endif %}
+{% if groups['smtpin'] is defined %}
+{% for host in groups[node_site + '-smtpin'] %}
+        <SmtpSampler guiclass="SmtpSamplerGui" testclass="SmtpSampler" testname="Send Mail" enabled="true">
+          <stringProp name="SMTPSampler.server">${g_SmtpInHostName}</stringProp>
+          <stringProp name="SMTPSampler.serverPort">${g_SmtpPort}</stringProp>
+          <stringProp name="SMTPSampler.mailFrom">${g_AddressFrom}</stringProp>
+          <stringProp name="SMTPSampler.replyTo"></stringProp>
+          <stringProp name="SMTPSampler.receiverTo">${g_AddressTo}</stringProp>
+          <stringProp name="SMTPSampler.receiverCC"></stringProp>
+          <stringProp name="SMTPSampler.receiverBCC"></stringProp>
+          <stringProp name="SMTPSampler.subject"></stringProp>
+          <stringProp name="SMTPSampler.suppressSubject">false</stringProp>
+          <stringProp name="SMTPSampler.include_timestamp">false</stringProp>
+          <stringProp name="SMTPSampler.message">Hi</stringProp>
+          <stringProp name="SMTPSampler.plainBody">false</stringProp>
+          <stringProp name="SMTPSampler.attachFile"></stringProp>
+          <stringProp name="SMTPSampler.useSSL">false</stringProp>
+          <stringProp name="SMTPSampler.useStartTLS">false</stringProp>
+          <stringProp name="SMTPSampler.trustAllCerts">false</stringProp>
+          <stringProp name="SMTPSampler.enforceStartTLS">false</stringProp>
+          <stringProp name="SMTPSampler.useLocalTrustStore">false</stringProp>
+          <stringProp name="SMTPSampler.trustStoreToUse"></stringProp>
+          <boolProp name="SMTPSampler.use_eml">false</boolProp>
+          <stringProp name="SMTPSampler.emlMessageToSend"></stringProp>
+          <stringProp name="SMTPSampler.useAuth">false</stringProp>
+          <stringProp name="SMTPSampler.password"></stringProp>
+          <stringProp name="SMTPSampler.username"></stringProp>
+          <stringProp name="SMTPSampler.messageSizeStatistics">false</stringProp>
+          <stringProp name="SMTPSampler.enableDebug">false</stringProp>
+          <collectionProp name="SMTPSampler.headerFields"/>
+        </SmtpSampler>
+        <hashTree/>
+        <org.apache.jmeter.protocol.ssh.sampler.SSHSampler guiclass="TestBeanGUI" testclass="org.apache.jmeter.protocol.ssh.sampler.SSHSampler" testname="Change the directory" enabled="true">
+          <stringProp name="command">cd ${g_Install_Path}/usr/store/logs/;ls -ltr</stringProp>
+          <stringProp name="hostname">${g_SmtpInHostName}</stringProp>
+          <stringProp name="password">${g_ImailPass}</stringProp>
+          <intProp name="port">22</intProp>
+          <stringProp name="username">${g_ImailUser}</stringProp>
+        </org.apache.jmeter.protocol.ssh.sampler.SSHSampler>
+        <hashTree>
+          <RegexExtractor guiclass="RegexExtractorGui" testclass="RegexExtractor" testname="Regular Expression Extractor" enabled="true">
+            <stringProp name="RegexExtractor.useHeaders">false</stringProp>
+            <stringProp name="RegexExtractor.refname">res1</stringProp>
+            <stringProp name="RegexExtractor.regex">smtp-(.*?).log</stringProp>
+            <stringProp name="RegexExtractor.template">$1$</stringProp>
+            <stringProp name="RegexExtractor.default">error</stringProp>
+            <stringProp name="RegexExtractor.match_number">1</stringProp>
+          </RegexExtractor>
+          <hashTree/>
+        </hashTree>
+        <org.apache.jmeter.protocol.ssh.sampler.SSHSampler guiclass="TestBeanGUI" testclass="org.apache.jmeter.protocol.ssh.sampler.SSHSampler" testname="Check the Smtp Log" enabled="true">
+          <stringProp name="hostname">${g_SmtpInHostName}</stringProp>
+          <intProp name="port">22</intProp>
+          <stringProp name="username">${g_ImailUser}</stringProp>
+          <stringProp name="password">${g_ImailPass}</stringProp>
+          <stringProp name="command">cat ${g_Install_Path}/usr/store/logs/${res1_g0}</stringProp>
+        </org.apache.jmeter.protocol.ssh.sampler.SSHSampler>
+        <hashTree/>
+{% endfor %}
+{% endif %}
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>false</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

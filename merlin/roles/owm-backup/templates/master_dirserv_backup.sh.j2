@@ -1,0 +1,11 @@
+#!/bin/bash
+#Create Temp Directory
+mkdir {{emailmx_user[0].home}}/imdirserv-back
+#Setting environment variables
+. ${HOME}/.profile
+#Take imdirserv backup
+{{emailmx_user[0].home}}/lib/imdirbackup -server imdirserv -budir {{emailmx_user[0].home}}/imdirserv-back
+#Copy Imdirserv backup files into backup server
+rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{emailmx_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress {{emailmx_user[0].home}}/imdirserv-back/imdirserv.* root@{{backupserver_ip_address}}:{{backup_server_path}}
+#Delete Temp Directory
+rm -rf {{emailmx_user[0].home}}/imdirserv-back

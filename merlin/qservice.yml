@@ -1,0 +1,11 @@
+---
+- hosts: directory
+  roles:
+    - owm-queue-service-configdb
+
+- hosts: qservice
+  roles:
+    - common
+    - jdk
+    - owm-common
+    - owm-queue-service

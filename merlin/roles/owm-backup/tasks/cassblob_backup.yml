@@ -1,0 +1,40 @@
+---
+- name: Take cassandra blobstore files backup
+  command: 'tar -cf {{cass_user[0].home}}/cassandra-blob-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz -C {{cass_user[0].home}}/cassandra-blob data -C {{cass_user[0].home}}/cassandra-blob saved_caches -C {{cass_user[0].home}}/cassandra-blob commitlog'
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-backup','cassblob','cassblob-backup' ]
+
+- name: Copy the Cassandra blobstore backup files into backup server
+  shell: 'rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{cass_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress {{cass_user[0].home}}/cassandra-blob-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz root@{{backupserver_ip_address}}:{{backup_server_path}}'
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-backup','cassblob','cassblob-backup' ]
+
+- name: Delete Cassandra blobstore backup file after copying into backup server
+  file: path={{cass_user[0].home}}/cassandra-blob-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz state=absent
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-backup','cassblob','cassblob-backup' ]
+  
+- name: Create directory to store script files
+  file: path={{cass_user[0].home}}/scripts state=directory mode=0755
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-backup','cassblob','cassblob-cronjob' ]
+
+- name: Cassandra blobstore backup script
+  template:
+    src: "cassblob_backup.sh.j2"
+    dest: "{{cass_user[0].home}}/scripts/cassblob_backup.sh"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    mode: 0644
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: ['owm-backup','cassblob','cassblob-cronjob']
+
+- name: Create cron job for cassandra blobstore backup
+  cron: name="Cron Job for cassandra blobstore backup" user="{{cass_user[0].username}}" minute="{{cassandra_backup[0].minute}}" hour="{{cassandra_backup[0].hour}}" day="{{cassandra_backup[0].day}}" month="{{cassandra_backup[0].month}}" weekday="{{cassandra_backup[0].weekday}}" job="bash {{cass_user[0].home}}/scripts/cassblob_backup.sh 2> /dev/null 2>&1"
+  tags: ['owm-backup','cassblob','cassblob-cronjob']
+

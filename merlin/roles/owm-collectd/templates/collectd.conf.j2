@@ -1,0 +1,64 @@
+LoadPlugin syslog
+LoadPlugin cpu
+LoadPlugin interface
+LoadPlugin load
+LoadPlugin memory
+LoadPlugin aggregation
+LoadPlugin tcpconns
+LoadPlugin write_graphite
+LoadPlugin disk
+LoadPlugin processes
+LoadPlugin swap
+LoadPlugin uptime
+LoadPlugin contextswitch
+LoadPlugin ethstat
+LoadPlugin irq
+LoadPlugin match_regex
+
+<Chain "PostCache">
+    <Rule>
+        <Match regex>
+                Plugin "^cpu$"
+                PluginInstance "^[0-9]+$"
+        </Match>
+        <Target write>
+                Plugin "aggregation"
+        </Target>
+        Target stop
+    </Rule>
+    Target "write"
+</Chain>
+
+<Plugin "aggregation">
+  <Aggregation>
+    Plugin "cpu"
+    Type "cpu"
+
+    GroupBy "Host"
+    GroupBy "TypeInstance"
+
+    CalculateSum true
+    CalculateAverage true
+  </Aggregation>
+</Plugin>
+
+<Plugin tcpconns>
+        ListeningPorts false
+        LocalPort "25"
+        LocalPort "5005"
+</Plugin>
+
+<Plugin write_graphite>
+  <Node "enfgraph-svc">
+    Host "{{ hostvars[groups[node_site+'-monitorui'][0]]['ansible_ssh_host'] }}"
+    Port "2003"
+    Protocol "tcp"
+    LogSendErrors true
+    Prefix ""
+    Postfix ""
+    StoreRates true
+    AlwaysAppendDS false
+    EscapeCharacter "_"
+  </Node>
+</Plugin>
+

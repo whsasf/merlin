@@ -1,0 +1,1406 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="2.8" jmeter="2.13 r1665067">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">true</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments">
+{% if groups['fep'] is defined %}
+{% for host in groups[node_site + '-fep'] %}
+{% if loop.index < 2 %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined and interface['vlan'] == "access" %}
+          <elementProp name="g_ImapHostName" elementType="Argument">
+	     <stringProp name="Argument.name">g_ImapHostName</stringProp>
+	     <stringProp name="Argument.value">{{ host + "-" + access_suffix }}</stringProp>
+	     <stringProp name="Argument.metadata">=</stringProp>
+	  </elementProp>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+          <elementProp name="g_ImapPort" elementType="Argument">
+            <stringProp name="Argument.name">g_ImapPort</stringProp>
+            <stringProp name="Argument.value">143</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_User" elementType="Argument">
+            <stringProp name="Argument.name">g_User</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_mos[0].user }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_Pass" elementType="Argument">
+            <stringProp name="Argument.name">g_Pass</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_mos[0].user }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+{% if groups['queue'] is defined %}
+{% for host in groups[node_site + '-queue'] %}
+          <elementProp name="g_MOSHostName{{loop.index}}" elementType="Argument">
+            <stringProp name="Argument.name">g_MOSHostName{{loop.index}}</stringProp>
+            <stringProp name="Argument.value">{{ host }}</stringProp>        
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+{% endfor %}
+{% endif %}
+          <elementProp name="g_ImailUser" elementType="Argument">
+            <stringProp name="Argument.name">g_ImailUser</stringProp>
+            <stringProp name="Argument.value">{{ emailmx_user[0].username }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+{% if groups['affinity'] is defined %}
+{% for host in groups[node_site + '-affinity-mos'] %}
+	     <elementProp name="g_NginxHostName{{loop.index}}" elementType="Argument">
+            <stringProp name="Argument.name">g_NginxHostName{{loop.index}}</stringProp>
+            <stringProp name="Argument.value">{{ host }}</stringProp>
+	    <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+{% endfor %}
+{% endif %}
+        </collectionProp>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="First Login" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1444804254000</longProp>
+        <longProp name="ThreadGroup.end_time">1444804254000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <TCPSampler guiclass="TCPSamplerGui" testclass="TCPSampler" testname="First Login" enabled="true">
+          <stringProp name="TCPSampler.server">${g_ImapHostName}</stringProp>
+          <boolProp name="TCPSampler.reUseConnection">true</boolProp>
+          <stringProp name="TCPSampler.port">143</stringProp>
+          <boolProp name="TCPSampler.nodelay">false</boolProp>
+          <stringProp name="TCPSampler.timeout"></stringProp>
+          <stringProp name="TCPSampler.request">a login ${g_User} ${g_Pass}
+a logout</stringProp>
+          <boolProp name="TCPSampler.closeConnection">false</boolProp>
+          <stringProp name="ConfigTestElement.username"></stringProp>
+          <stringProp name="ConfigTestElement.password"></stringProp>
+        </TCPSampler>
+        <hashTree/>
+{% if groups['queue'] is defined %}
+{% for host in groups[node_site + '-queue'] %}
+{% if loop.index < 2 %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check MOS logs in first MOS" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_MOSHostName{{loop.index}}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_ImailUser} -c &apos;grep -i authenticateAndGetMailbox {{ emailmx_user[0].home }}/mxos/logs/mxos.log&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+            <stringProp name="ConstantTimer.delay">90000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+        </hashTree>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['affinity'] is defined %}
+{% for host in groups[node_site + '-affinity-mos'] %}
+        <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check Nginx Logs For First login" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_NginxHostName{{ loop.index }}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;grep -i authenticateAndGetMailbox {{ nginx_home_dir }}/nginx_mos/nginx{{ owm_nginx_version }}/logs/access.log&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endfor %}
+{% endif %} 
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>false</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Second Login" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1445334572000</longProp>
+        <longProp name="ThreadGroup.end_time">1445334572000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <TCPSampler guiclass="TCPSamplerGui" testclass="TCPSampler" testname="Second  Login" enabled="true">
+          <stringProp name="TCPSampler.server">${g_ImapHostName}</stringProp>
+          <boolProp name="TCPSampler.reUseConnection">true</boolProp>
+          <stringProp name="TCPSampler.port">143</stringProp>
+          <boolProp name="TCPSampler.nodelay">false</boolProp>
+          <stringProp name="TCPSampler.timeout"></stringProp>
+          <stringProp name="TCPSampler.request">a login ${g_User} ${g_Pass}
+a logout</stringProp>
+          <boolProp name="TCPSampler.closeConnection">false</boolProp>
+          <stringProp name="ConfigTestElement.username"></stringProp>
+          <stringProp name="ConfigTestElement.password"></stringProp>
+        </TCPSampler>
+        <hashTree/>
+{% if groups['queue'] is defined %}
+{% for host in groups[node_site + '-queue'] %}
+{% if loop.index >= 2 %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check MOS logs in second MOS" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_MOSHostName{{loop.index}}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_ImailUser} -c &apos;grep -i authenticateAndGetMailbox {{ emailmx_user[0].home }}/mxos/logs/mxos.log&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+            <stringProp name="ConstantTimer.delay">90000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['affinity'] is defined %}
+{% for host in groups[node_site + '-affinity-mos'] %}
+        <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check Nginx Logs For Second Login" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_NginxHostName{{ loop.index }}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;grep -i authenticateAndGetMailbox {{ nginx_home_dir }}/nginx_mos/nginx{{ owm_nginx_version }}/logs/access.log&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endfor %}
+{% endif %} 
+{% if groups['queue'] is defined %}
+{% for host in groups[node_site + '-queue'] %}
+{% if loop.index >= 2 %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Stop second MOS" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_MOSHostName{{loop.index}}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_ImailUser} -c &apos;mxos/scripts/mxos.sh stop&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>false</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="First Login" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1445335008000</longProp>
+        <longProp name="ThreadGroup.end_time">1445335008000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <TCPSampler guiclass="TCPSamplerGui" testclass="TCPSampler" testname="First Login" enabled="true">
+          <stringProp name="TCPSampler.server">${g_ImapHostName}</stringProp>
+          <boolProp name="TCPSampler.reUseConnection">true</boolProp>
+          <stringProp name="TCPSampler.port">143</stringProp>
+          <boolProp name="TCPSampler.nodelay">false</boolProp>
+          <stringProp name="TCPSampler.timeout"></stringProp>
+          <stringProp name="TCPSampler.request">a login ${g_User} ${g_Pass}
+a logout</stringProp>
+          <boolProp name="TCPSampler.closeConnection">false</boolProp>
+          <stringProp name="ConfigTestElement.username"></stringProp>
+          <stringProp name="ConfigTestElement.password"></stringProp>
+        </TCPSampler>
+        <hashTree/>
+{% if groups['queue'] is defined %}
+{% for host in groups[node_site + '-queue'] %}
+{% if loop.index < 2 %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check MOS logs in first MOS" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_MOSHostName{{loop.index}}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_ImailUser} -c &apos;grep -i authenticateAndGetMailbox {{ emailmx_user[0].home }}/mxos/logs/mxos.log&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+            <stringProp name="ConstantTimer.delay">90000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+        </hashTree>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['affinity'] is defined %}
+{% for host in groups[node_site + '-affinity-mos'] %}
+        <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check Nginx logs For First Login" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_NginxHostName{{ loop.index }}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;grep -i authenticateAndGetMailbox {{ nginx_home_dir }}/nginx_mos/nginx{{ owm_nginx_version }}/logs/access.log&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endfor %}
+{% endif %} 
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>false</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Second Login" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1445334572000</longProp>
+        <longProp name="ThreadGroup.end_time">1445334572000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <TCPSampler guiclass="TCPSamplerGui" testclass="TCPSampler" testname="Second  Login" enabled="true">
+          <stringProp name="TCPSampler.server">${g_ImapHostName}</stringProp>
+          <boolProp name="TCPSampler.reUseConnection">true</boolProp>
+          <stringProp name="TCPSampler.port">143</stringProp>
+          <boolProp name="TCPSampler.nodelay">false</boolProp>
+          <stringProp name="TCPSampler.timeout"></stringProp>
+          <stringProp name="TCPSampler.request">a login ${g_User} ${g_Pass}
+a logout</stringProp>
+          <boolProp name="TCPSampler.closeConnection">false</boolProp>
+          <stringProp name="ConfigTestElement.username"></stringProp>
+          <stringProp name="ConfigTestElement.password"></stringProp>
+        </TCPSampler>
+        <hashTree/>
+{% if groups['queue'] is defined %}
+{% for host in groups[node_site + '-queue'] %}
+{% if loop.index < 2 %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check MOS logs for second login in first MOS" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_MOSHostName{{loop.index}}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_ImailUser} -c &apos;grep -i authenticateAndGetMailbox {{ emailmx_user[0].home }}/mxos/logs/mxos.log&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+            <stringProp name="ConstantTimer.delay">90000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+        </hashTree>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['affinity'] is defined %}
+{% for host in groups[node_site+'-affinity-mos'] %}
+        <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check Nginx Logs" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_NginxHostName{{ loop.index }}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;grep -i authenticateAndGetMailbox {{ nginx_home_dir }}/nginx_mos/nginx{{ owm_nginx_version }}/logs/access.log&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endfor %}
+{% endif %} 
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>false</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Start MOS" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1445400996000</longProp>
+        <longProp name="ThreadGroup.end_time">1445400996000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+{% if groups['queue'] is defined %}
+{% for host in groups[node_site + '-queue'] %}
+{% if loop.index >= 2 %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Start second MOS" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_MOSHostName{{loop.index}}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_ImailUser} -c &apos;mxos/scripts/mxos.sh start&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endif %}
+{% endfor %}
+{% endif %}
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>false</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="First Login" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1444804254000</longProp>
+        <longProp name="ThreadGroup.end_time">1444804254000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <TCPSampler guiclass="TCPSamplerGui" testclass="TCPSampler" testname="First Login" enabled="true">
+          <stringProp name="TCPSampler.server">${g_ImapHostName}</stringProp>
+          <boolProp name="TCPSampler.reUseConnection">true</boolProp>
+          <stringProp name="TCPSampler.port">143</stringProp>
+          <boolProp name="TCPSampler.nodelay">false</boolProp>
+          <stringProp name="TCPSampler.timeout"></stringProp>
+          <stringProp name="TCPSampler.request">a login ${g_User} ${g_Pass}
+a logout</stringProp>
+          <boolProp name="TCPSampler.closeConnection">false</boolProp>
+          <stringProp name="ConfigTestElement.username"></stringProp>
+          <stringProp name="ConfigTestElement.password"></stringProp>
+        </TCPSampler>
+        <hashTree/>
+{% if groups['queue'] is defined %}
+{% for host in groups[node_site + '-queue'] %}
+{% if loop.index < 2 %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check MOS logs in first MOS" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_MOSHostName{{loop.index}}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_ImailUser} -c &apos;grep -i authenticateAndGetMailbox {{ emailmx_user[0].home }}/mxos/logs/mxos.log&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+            <stringProp name="ConstantTimer.delay">90000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+        </hashTree>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['affinity'] is defined %}
+{% for host in groups[node_site + '-affinity-mos'] %}
+       <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check Nginx Logs" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_NginxHostName{{ loop.index }}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;grep -i authenticateAndGetMailbox {{ nginx_home_dir }}/nginx_mos/nginx{{ owm_nginx_version }}/logs/access.log&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endfor %}
+{% endif %} 
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>false</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Second Login" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1445334572000</longProp>
+        <longProp name="ThreadGroup.end_time">1445334572000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <TCPSampler guiclass="TCPSamplerGui" testclass="TCPSampler" testname="Second  Login" enabled="true">
+          <stringProp name="TCPSampler.server">${g_ImapHostName}</stringProp>
+          <boolProp name="TCPSampler.reUseConnection">true</boolProp>
+          <stringProp name="TCPSampler.port">143</stringProp>
+          <boolProp name="TCPSampler.nodelay">false</boolProp>
+          <stringProp name="TCPSampler.timeout"></stringProp>
+          <stringProp name="TCPSampler.request">a login ${g_User} ${g_Pass}
+a logout</stringProp>
+          <boolProp name="TCPSampler.closeConnection">false</boolProp>
+          <stringProp name="ConfigTestElement.username"></stringProp>
+          <stringProp name="ConfigTestElement.password"></stringProp>
+        </TCPSampler>
+        <hashTree/>
+{% if groups['queue'] is defined %}
+{% for host in groups[node_site + '-queue'] %}
+{% if loop.index >= 2 %}
+      <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check MOS logs in second MOS" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_MOSHostName{{loop.index}}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_ImailUser} -c &apos;grep -i authenticateAndGetMailbox {{ emailmx_user[0].home }}/mxos/logs/mxos.log&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+            <stringProp name="ConstantTimer.delay">90000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+        </hashTree>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if groups['affinity'] is defined %}
+{% for host in groups[node_site + '-affinity-mos'] %}
+        <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check Nginx Logs" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_NginxHostName{{ loop.index }}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;grep -i authenticateAndGetMailbox {{ nginx_home_dir }}/nginx_mos/nginx{{ owm_nginx_version }}/logs/access.log&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+{% endfor %}
+{% endif %} 
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>false</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

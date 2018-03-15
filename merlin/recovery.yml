@@ -1,0 +1,5 @@
+---
+- hosts: [mx,cassmeta,cassblob,backupserver] 
+  roles:
+    - owm-backup-setup
+    - owm-recover

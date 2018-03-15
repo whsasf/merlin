@@ -1,0 +1,3 @@
+---
+- name: restart rbldnsd
+  service: name={{ rbldnsd_service_name }} state=restarted

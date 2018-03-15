@@ -1,0 +1,20 @@
+---
+- name: Determine if EPEL repo is already configured
+  stat: path=/etc/yum.repos.d/epel.repo
+  register: epel_repo
+  tags: [ 'package', 'epel' ]
+
+- name: Deal with EPEL certificate issue.
+  action: command yum -y upgrade ca-certificates
+  when: epel_repo.stat.exists == False
+  tags: [ 'package', 'epel' ]
+
+- name: Install EPEL repo.
+  yum: name="{{ epel_repo_url }}" state=present
+  when: epel_repo.stat.exists == False
+  tags: [ 'package', 'epel' ]
+
+- name: Import EPEL GPG key.
+  rpm_key: key="{{ epel_repo_gpg_key_location }}" state=present
+  when: epel_repo.stat.exists == False
+  tags: [ 'package', 'epel' ]

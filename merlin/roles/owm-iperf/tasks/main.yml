@@ -1,0 +1,42 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-iperf' ]
+
+- name: Determine the iperf-server ip address
+  set_fact:
+    iperfserv_host: "{{ hostvars[item]['ansible_ssh_host'] }}"
+  with_items: "{{ groups[ node_site + '-iperfserv'] }}"
+  tags: [ 'owm-iperf' ]
+
+- name: Install the iperf stress tool
+  yum: name=iperf state=present
+  tags: [ 'owm-iperf' ]
+
+- name: Start the iperf server in TCP mode
+  command: iperf -s -p {{ iperfserv_port }} -D
+  when: inventory_hostname in groups['{{ node_site}}-iperfserv']
+  tags: [ 'owm-iperf' ]
+
+- name: Start the iperf server in UDP mode
+  command: iperf -s -p {{ iperfserv_port }} -D -u
+  when: inventory_hostname in groups['{{ node_site}}-iperfserv']
+  tags: [ 'owm-iperf' ]
+
+- name: Create the directory to save the report
+  file: path=/opt/merlin/iperf state=directory
+  when: inventory_hostname not in groups['{{ node_site}}-iperfserv']
+  tags: [ 'owm-iperf' ]
+
+- name: Run test for TCP for iperf client
+  shell: iperf -c {{ iperfserv_host }} -p {{ iperfserv_port }} >> /opt/merlin/iperf/{{ iperf_tcp_report }}
+  when: inventory_hostname not in groups['{{ node_site}}-iperfserv']
+  tags: [ 'owm-iperf' ] 
+
+- name: Run test for UDP for iperf client
+  shell: iperf -c {{ iperfserv_host }} -p {{ iperfserv_port }} -u -b {{ iperf_bandwidth_to_test }} >> /opt/merlin/iperf/{{ iperf_udp_report }}
+  when: inventory_hostname not in groups['{{ node_site}}-iperfserv']
+  tags: [ 'owm-iperf' ]

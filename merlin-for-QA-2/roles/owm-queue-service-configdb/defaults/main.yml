@@ -1,0 +1,16 @@
+---
+queue_service_blob_chunk_size_in_kb: 128
+queue_service_cas_retry_count: 3
+queue_service_max_message_size_in_mb: 10
+queue_service_max_queue_length: 100000
+queue_service_max_queue_size_in_mb: 10000
+queue_service_queue_high_watermark: 90
+queue_service_queue_low_watermark: 70
+
+queue_service_cassmeta_read_consistency: QUORUM
+queue_service_cassmeta_write_consistency: QUORUM
+queue_service_cassblob_read_consistency: QUORUM
+queue_service_cassblob_write_consistency: QUORUM
+
+cassandra_meta_native_transport_port: 9042
+cassandra_blob_native_transport_port: 9042

@@ -1,0 +1,11 @@
+---
+# Email Id to which notifications will be sent
+aide_admin_email: xyz@owmessaging.com
+# The below is configured to daily run the Aide Security Tool
+aide_cron_config:
+   - minute: "0"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"
+     

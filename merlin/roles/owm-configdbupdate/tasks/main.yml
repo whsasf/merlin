@@ -1,0 +1,34 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-configdbupdate' ]
+
+- name: Determine cluster name
+  set_fact:
+    node_cluster: "{{ item }}"
+  with_items: "{{ clusters }}"
+  when: hostvars[inventory_hostname]['clusterId'] is defined and hostvars[inventory_hostname]['clusterId'] == "{{ item }}"
+  tags: [ 'owm-configdbupdate' ]
+
+- name: Create directory to store script files
+  file: path=/opt/merlin/configupdate state=directory mode=0755 owner="root" group="root"
+  when: inventory_hostname in groups['{{ node_site }}-directory'] and hostvars[inventory_hostname]['primary'] is defined and hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: [ 'owm-configdbupdate' ]  
+  
+- name: Copy UpdateConfigdb.sh
+  template:
+    src: "UpdateConfigdb.sh.j2"
+    dest: "/opt/merlin/configupdate/UpdateConfigdb.sh"
+    owner: "root"
+    group: "root"
+    mode: 0777
+  when: inventory_hostname in groups['{{ node_site }}-directory'] and hostvars[inventory_hostname]['primary'] is defined and hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: [ 'owm-configdbupdate' ]
+
+- name: Run script UpdateConfigdb.sh
+  shell: /opt/merlin/configupdate/UpdateConfigdb.sh
+  when: inventory_hostname in groups['{{ node_site }}-directory'] and hostvars[inventory_hostname]['primary'] is defined and hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: [ 'owm-configdbupdate' ]

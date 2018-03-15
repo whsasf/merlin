@@ -1,0 +1,48 @@
+---
+- name: Copy the backup file from backup server to mos server home directory
+  shell: 'rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{emailmx_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress root@{{backupserver_ip_address}}:{{backup_server_path}}/mxos-{{inventory_hostname}}-{{mos_backup_date}}.tar.gz {{emailmx_user[0].home}}'
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','mos' ]
+
+- name: Untar mos server tar file
+  unarchive: src={{emailmx_user[0].home}}/mxos-{{inventory_hostname}}-{{mos_backup_date}}.tar.gz dest={{emailmx_user[0].home}} copy=no
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','mos' ]
+
+- name: Stop mos server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/mxos/scripts/mxos.sh stop'
+  register: mos_check
+  failed_when: mos_check.rc > 1
+  ignore_errors: true
+  changed_when: no
+  tags: [ 'owm-recover','mos' ]
+
+- name: Update mos mxos.properties configuration file
+  command: mv {{emailmx_user[0].home}}/mxos.properties {{emailmx_user[0].home}}/mxos/config/
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','mos' ]
+
+- name: Update mos gateway-config.xml configuration file
+  command: mv {{emailmx_user[0].home}}/gateway-config.xml {{emailmx_user[0].home}}/mxos/config/
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','mos' ]
+
+- name: Update mos hazelcast-mxos.xml configuration file
+  command: mv {{emailmx_user[0].home}}/hazelcast-mxos.xml {{emailmx_user[0].home}}/mxos/config/hazelcast/
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','mos' ]
+
+- name: Start mos server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/mxos/scripts/mxos.sh start'
+  tags: [ 'owm-recover','mos' ]
+
+- name: Delete file after recovery of mos server
+  file: path={{emailmx_user[0].home}}/mxos-{{inventory_hostname}}-{{mos_backup_date}}.tar.gz state=absent
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','mos' ]

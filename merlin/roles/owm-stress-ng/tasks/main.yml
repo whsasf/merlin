@@ -1,0 +1,27 @@
+---
+
+- name: Create stressng directory
+  file: path=/opt/merlin/stressng state=directory
+  tags: ['owm-stress-ng']
+
+- name: Check if stress-ng is installed
+  shell: rpm -qa | grep -i stress-ng
+  register: STRESSNG
+  failed_when: STRESSNG.rc > 1
+  ignore_errors: true
+  changed_when: no
+  
+- name: Install stress-ng Package
+  yum: name=stress-ng state=present
+  when: STRESSNG.rc != 0
+  tags: ['owm-stress-ng']
+
+- name: Run the stress-ng
+  command: "stress-ng --cpu {{cpu_stressors}} --cpu-method all -t {{stress_ng_second}}"
+  register: OUTPUT
+  tags: ['owm-stress-ng']
+
+- name: Saving output to /opt/merlin/stressng/stressngtestresults.txt
+  shell: echo "{{item}}" >> /opt/merlin/stressng/stressngtestresults.txt
+  with_items: OUTPUT.stdout_lines
+  tags: ['owm-stress-ng']

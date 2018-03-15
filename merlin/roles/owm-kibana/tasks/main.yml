@@ -1,0 +1,51 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-kibana' ]
+
+- name: Check if kibana is already installed
+  stat: path="{{kibana_dir}}/kibana-{{kibana_version}}-linux-x64/bin/kibana"
+  changed_when: false
+  register: kibana_installed
+  tags: [ 'owm-kibana' ]
+
+- name: Create directory for Kibana log
+  file: path={{kibana_dir}}/kibana-{{kibana_version}}-linux-x64/log state=directory
+  tags: [ 'owm-kibana' ]
+
+- name: Get kibana package
+  get_url: url="{{owm_tar_url}}/kibana-{{kibana_version}}-linux-x64.tar.gz" dest="{{ kibana_dir }}"
+  when: kibana_installed.stat.exists == false
+  tags: ['owm-kibana']
+
+- name: Untar kibana tar.gz
+  unarchive: src="{{kibana_dir}}/kibana-{{kibana_version}}-linux-x64.tar.gz" dest="{{kibana_dir}}" copy=no
+  when: kibana_installed.stat.exists == false
+  tags: ['owm-kibana']
+
+- name: Place kibana.yml file
+  template:
+    src: "kibana.yml.j2"
+    dest: "{{kibana_dir}}/kibana-{{kibana_version}}-linux-x64/config/kibana.yml"
+    mode: 0664
+  tags: ['owm-kibana']
+
+- name: Add Kibana init configuration
+  template: 
+    src: "kibana.j2"
+    dest: "/etc/init.d/kibana"
+    owner: "root" 
+    group: "root"
+    mode: 0755
+  tags: ['owm-kibana']
+
+- name: Starting Kibana
+  service: name=kibana state=started enabled=yes
+  tags: ['owm-kibana','elkstart']
+  
+- name: Add Kibana on boot up
+  shell: /sbin/chkconfig --add kibana
+  tags: ['owm-kibana']

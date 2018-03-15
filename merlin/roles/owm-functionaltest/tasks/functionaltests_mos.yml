@@ -1,0 +1,33 @@
+---
+- name: Create directories for mOS
+  file: path=/opt/merlin/jmeter/{{ item }}/mos state=directory
+  with_items:
+    - "tests"
+    - "reports"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mos' ]
+
+- name: Put test cases for mOS
+  template: src=mos/{{ item.test_case }}.j2 dest=/opt/merlin/jmeter/tests/mos/{{ item.test_case }}
+  with_items:
+    - { test_case: 'Test_mos_create_user.jmx' }
+    - { test_case: 'Test_mos_create_message.jmx' }
+    - { test_case: 'Test_mos_read_message.jmx' }
+    - { test_case: 'Test_mos_retrieve_COS.jmx' }
+    - { test_case: 'Test_mos_retrieve_domain.jmx' }
+    - { test_case: 'Test_mos_failover_to_mos1_when_mos2_is_down.jmx' }
+    - { test_case: 'Test_mos_fallback_to_mos2_after_mos2_restart.jmx' }
+    - { test_case: 'Test_mos_fallback_after_restarting_both_mos.jmx' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mos' ]
+
+- name: Execute JMeter test cases for mOS
+  shell: /opt/merlin/jmeter/apache-jmeter-{{jmeter_version}}/bin/jmeter -n -t /opt/merlin/jmeter/tests/mos/{{ item.test }} -l /opt/merlin/jmeter/reports/mos/{{ item.report }}
+  with_items:
+    - { test: 'Test_mos_create_user.jmx', report: 'Report_mos_create_user.jtl' }
+    - { test: 'Test_mos_create_message.jmx', report: 'Report_mos_create_message.jtl' }
+    - { test: 'Test_mos_read_message.jmx', report: 'Report_mos_read_message.jtl' }
+    - { test: 'Test_mos_retrieve_COS.jmx', report: 'Report_mos_retrieve_COS.jtl' }
+    - { test: 'Test_mos_retrieve_domain.jmx', report: 'Report_mos_retrieve_domain.jtl' }
+    - { test: 'Test_mos_failover_to_mos1_when_mos2_is_down.jmx', report: 'Report_mos_failover_to_mos1_when_mos2_is_down.jtl' }
+    - { test: 'Test_mos_fallback_to_mos2_after_mos2_restart.jmx', report: 'Report_mos_fallback_to_mos2_after_mos2_restart.jtl' }
+    - { test: 'Test_mos_fallback_after_restarting_both_mos.jmx', report: 'Report_mos_fallback_after_restarting_both_mos.jtl' } 
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mos' ]

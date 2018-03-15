@@ -1,0 +1,46 @@
+# {{ ansible_managed }}
+
+define hostgroup {
+  hostgroup_name dirservers 
+  alias Directory Servers
+}
+{% if groups['directory'] is defined %}
+{% for host in groups['directory'] %}
+
+define host {
+  use                     linux-server
+  host_name               {{ host }}
+  alias                   {{ host }}
+  address                 {{ hostvars[host].ansible_ssh_host }}
+  hostgroups              dirservers 
+}
+{% endfor %}
+
+define service {
+  use                     local-service
+  hostgroup_name          dirservers
+  service_description     Mx imconfserv version
+  check_command           get_mx_version!5001!!!!!!!
+}
+
+define service {
+  use                     local-service
+  hostgroup_name          dirservers
+  service_description     Mx immgrserv version
+  check_command           get_mx_version!5003!!!!!!!
+}
+
+define service {
+  use                     local-service
+  hostgroup_name          dirservers
+  service_description     Mx imdirserv version
+  check_command           get_mx_version!5006!!!!!!!
+}
+
+define service {
+  use                     local-service
+  hostgroup_name          dirservers
+  service_description     Mx imdircacheserv version
+  check_command           get_mx_version!5008!!!!!!!
+}
+{% endif %}

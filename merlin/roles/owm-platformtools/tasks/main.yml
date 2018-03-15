@@ -1,0 +1,137 @@
+---
+- name: Check if PlatformTools is installed
+  command: rpm -q PlatformTools
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  tags: [ 'owm-platformtools', 'package' ]
+  check_mode: no
+
+- name: Fresh Install PlatformTools
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} rpm --prefix={{emailmx_user[0].home}}/platformtools -ivh {{owm_repo_url}}/PlatformTools-{{platformtools_version}}.rpm'
+  when: rpm_check.rc != 0
+  tags: [ 'owm-platformtools', 'package' ]
+  
+  
+#
+# Handle Upgrade / Downgrade
+#
+
+- name: Set Package Name
+  set_fact: 
+    package_name: "PlatformTools"
+  when: rpm_check.rc == 0
+  tags: [ 'owm-platformtools','package' ]
+
+# Check specific version
+- name: Get version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-platformtools','package' ]
+  check_mode: no
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0
+  tags: [ 'owm-platformtools','package' ]
+
+# See which version is higher or lower
+- name: Compare installed RPM version with expected version
+  shell: '/tmp/compare_versions.sh {{platformtools_version}} {{rpm_version.stdout}}'
+  register: version_comparison
+  ignore_errors: yes
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-platformtools','package' ]
+  check_mode: no
+
+- debug:
+     msg: "Keeping the existing {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0 and version_comparison.rc == 0
+  tags: [ 'owm-platformtools','package' ]
+
+# Try to catch the case that user specified a RPM package that is not in the {{owm_repo_url}}
+- name: Ensure {{owm_repo_url}} contains {{ package_name }}-{{platformtools_version}} RPM
+  uri: 
+    url: "{{owm_repo_url}}/{{ package_name }}-{{platformtools_version}}.rpm"
+    method: GET
+    status_code: 200
+  register: rpmpkg_file
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+
+- debug: 
+     msg: "{{ package_name }}-{{platformtools_version}}.rpm is not found in {{owm_repo_url}}"
+  when: rpm_check.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+
+- name: Abort if the {{ package_name }}-{{platformtools_version}} RPM  is missing
+  meta: end_play
+  when: rpm_check.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name }} upgrade from {{rpm_version.stdout}} to {{platformtools_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1 
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name }} downgrade from {{rpm_version.stdout}} to {{platformtools_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2 
+  
+- pause: seconds=30
+  when: rpm_check.rc == 0 and version_comparison.rc != 0
+
+# If application is already installed, and is a lower version do an upgrade
+- name: Upgrade {{ package_name }} from {{rpm_version.stdout}} to {{platformtools_version}}
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} rpm --prefix={{emailmx_user[0].home}}/platformtools -Uvh {{owm_repo_url}}/PlatformTools-{{platformtools_version}}.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'owm-platformtools','package' ]
+
+# If application is already installed, and is a higher version, downgrade
+# Downgrade Step #1 - remove old package
+- name: Downgrade Step 1, remove old {{ package_name }}-{{rpm_version.stdout}} package
+  shell: 'rpm -e {{ package_name }}-{{rpm_version.stdout}}'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-platformtools','package' ]
+
+# Downgrade Step #2 - install older package
+- name: Downgrade Step 2, install older {{ package_name }}-{{platformtools_version}} package
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} rpm --prefix={{emailmx_user[0].home}}/platformtools -ivh {{owm_repo_url}}/PlatformTools-{{platformtools_version}}.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-platformtools','package' ]
+
+# Check specific version
+- name: Get new version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-platformtools','package' ]
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (upgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'owm-platformtools','package' ]
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (downgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-platformtools','package' ]
+
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-platformtools', 'configuration' ]
+
+- name: Determine mOS host name (if available)
+  set_fact:
+    mos_host: '{{ groups[node_site + "-mxos"][0] }}'
+  when: mos_host is not defined and node_site is defined and groups['{{node_site}}-directory'] is defined
+  tags: [ 'owm-platformtools', 'configuration' ]
+
+- name: Configure PlatformTools
+  lineinfile: dest={{emailmx_user[0].home}}/platformtools/config/utils.properties regexp='^mxosBaseUrl=' line='mxosBaseUrl=http://{{ mos_host }}:8081/mxos' owner={{emailmx_user[0].username}} group={{emailmx_user[0].username}} mode=0644
+  when: mos_host is defined
+  tags: [ 'owm-platformtools', 'configuration' ]

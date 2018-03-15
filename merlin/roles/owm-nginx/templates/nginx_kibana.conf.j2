@@ -1,0 +1,36 @@
+worker_processes auto;
+
+daemon on;
+master_process on;
+
+
+error_log  logs/error.log error;
+
+pid        {{ nginx_home_dir }}/nginx_{{component}}/nginx{{ owm_nginx_version }}/logs/nginx.pid;
+
+worker_rlimit_nofile 200000;
+worker_rlimit_core  500M;
+working_directory   {{ nginx_home_dir }}/nginx_{{component}}/nginx{{ owm_nginx_version }};
+
+events {
+    worker_connections 25000;
+    use epoll;
+    multi_accept off;
+}
+http {
+    upstream myapp1 {
+	{% set elkgroupname = node_site+'-elk' %}
+	{% if groups[elkgroupname] is defined %}
+    {% for host in groups[elkgroupname] %}
+        server {{ hostvars[host]['ansible_ssh_host'] }}:9200;
+    {% endfor %}
+	{% endif %}
+    }
+        server {
+        listen {{elasticsearch_load_balancer_port}};
+        location / {
+            proxy_pass http://myapp1;
+        }
+    }
+}
+

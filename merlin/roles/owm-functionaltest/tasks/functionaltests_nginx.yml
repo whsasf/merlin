@@ -1,0 +1,29 @@
+---
+- name: Create directories for NGINX
+  file: path=/opt/merlin/jmeter/{{ item }}/nginx state=directory
+  with_items:
+    - "tests"
+    - "reports"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-nginx' ]
+
+- name: Put test cases for NGINX
+  template: src=nginx/{{ item.test_case }}.j2 dest=/opt/merlin/jmeter/tests/nginx/{{ item.test_case }}
+  with_items:
+    - { test_case: 'Test_nginx_stop.jmx' }
+    - { test_case: 'Test_nginx_start.jmx' }
+    - { test_case: 'Test_nginx_status.jmx' }
+    - { test_case: 'Test_nginx_mOS_access_logs.jmx' }
+    - { test_case: 'Test_nginx_mss_failover.jmx' }
+    - { test_case: 'Test_nginx_mss_fallback.jmx' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-nginx' ]
+
+- name: Execute JMeter test cases for NGINX
+  shell: /opt/merlin/jmeter/apache-jmeter-{{jmeter_version}}/bin/jmeter -n -t /opt/merlin/jmeter/tests/nginx/{{ item.test }} -l /opt/merlin/jmeter/reports/nginx/{{ item.report }}
+  with_items:
+    - { test: 'Test_nginx_stop.jmx', report: 'Report_nginx_stop.jtl' }
+    - { test: 'Test_nginx_start.jmx', report: 'Report_nginx_start.jtl' }
+    - { test: 'Test_nginx_status.jmx', report: 'Report_nginx_status.jtl' }
+    - { test: 'Test_nginx_mOS_access_logs.jmx', report: 'Report_nginx_mOS_access_logs.jtl' }
+    - { test: 'Test_nginx_mss_failover.jmx', report: 'Report_nginx_mss_failover.jtl' }
+    - { test: 'Test_nginx_mss_fallback.jmx', report: 'Report_nginx_mss_fallback.jtl' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-nginx' ]

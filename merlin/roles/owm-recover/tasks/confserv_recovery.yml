@@ -1,0 +1,30 @@
+---
+- name: Copy the backup file from backup server to conf server home directory
+  shell: 'rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{emailmx_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress root@{{backupserver_ip_address}}:{{backup_server_path}}/conf-server-{{inventory_hostname}}-{{confserv_backup_date}}.tar.gz {{emailmx_user[0].home}}'
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','confserv' ]
+
+- name: Stop conf server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl stop imconfserv'
+  tags: [ 'owm-recover','confserv' ]
+
+- name: Untar conf server tar file
+  unarchive: src={{emailmx_user[0].home}}/conf-server-{{inventory_hostname}}-{{confserv_backup_date}}.tar.gz dest={{emailmx_user[0].home}} copy=no
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','confserv' ]
+  
+- name: Update configuration file
+  command: mv {{emailmx_user[0].home}}/config.db {{emailmx_user[0].home}}/config/config.db
+  tags: [ 'owm-recover','confserv' ]
+
+- name: Start conf server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl start imconfserv'
+  tags: [ 'owm-recover','confserv' ]
+
+- name: Delete file after recovery of conf server
+  file: path={{emailmx_user[0].home}}/conf-server-{{inventory_hostname}}-{{confserv_backup_date}}.tar.gz state=absent
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','confserv' ]

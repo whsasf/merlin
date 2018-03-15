@@ -1,0 +1,71 @@
+---
+- name: Determine the site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-nessus-client' ]
+
+- name: Set URL to Nessus Server to execute the CURL commands
+  set_fact:
+      nessus_server_url: "https://{{ hostvars[item]['ansible_ssh_host'] }}:8834"
+  with_items: "{{ groups[node_site + '-security'] }}"
+  tags: [ 'owm-nessus-client' ]
+
+- name: Create directory to download report
+  file: path={{nessus_report_download_location}} state=directory
+  tags: [ 'owm-nessus-client' ]
+
+- name: Sets the hosts to scan
+  set_fact:
+      target_hosts:  |
+       {% set comma = joiner(",") %}
+       {% for item in groups[node_site] -%}
+           {{ comma() }}{{ hostvars[item]['ansible_ssh_host'] }}
+       {%- endfor %}
+  tags: [ 'owm-nessus-client' ]
+
+- name: Pause to initilize the Nessus Server    
+  pause: minutes={{ initilize_time }}
+  tags: [ 'owm-nessus-client' ]
+
+- name: Login to Nessus Server
+  uri: url='{{nessus_server_url}}/session' method=POST  HEADER_Content-Type='application/json' body='{"username":"{{owm_nessus_username}}","password":"{{owm_nessus_password}}"}' validate_certs=no
+  register: login_token_info
+  tags: [ 'owm-nessus-client' ]
+
+- name: Get list of scan policies
+  uri: url='{{nessus_server_url}}/editor/policy/templates?token={{login_token_info.json.token}}' method=GET force_basic_auth=yes HEADER_Content-Type='application/json' validate_certs=no
+  register: policy_info
+  tags: [ 'owm-nessus-client' ]
+
+- name: Create a new scan on Nessues Server
+  uri: url='{{nessus_server_url}}/scans?token={{login_token_info.json.token}}' method=POST HEADER_Content-Type='application/json' body='{"token":"{{login_token_info.json.token}}","uuid":"{{policy_info.json.templates[0].uuid}}","settings":{"name":"{{scan_name}}","description":"{{scan_description}}","text_targets":"{{target_hosts}}"}' validate_certs=no
+  register: scan_info
+  tags: [ 'owm-nessus-client' ]
+
+- name: Launch the newly created scan on Nessus Server
+  uri: url='{{nessus_server_url}}/scans/{{scan_info.json.scan.id}}/launch?token={{login_token_info.json.token}}' method=POST HEADER_Content-Type='application/json' body='{"token":"{{login_token_info.json.token}}"' validate_certs=no
+  tags: [ 'owm-nessus-client' ]
+
+- name: Wait till {{scan_completion_time}} minutes to complete the scan
+  pause: minutes='{{scan_completion_time}}'
+  tags: [ 'owm-nessus-client' ]
+
+- name: Re-login to Nessus Server to download the scan report
+  uri: url='{{nessus_server_url}}/session' method=POST  HEADER_Content-Type='application/json' body='{"username":"{{owm_nessus_username}}","password":"{{owm_nessus_password}}"}' validate_certs=no
+  register: relogin_info
+  tags: [ 'owm-nessus-client' ]
+
+- name: Export the scan report
+  uri: url='{{nessus_server_url}}/scans/{{scan_info.json.scan.id}}/export?token={{relogin_info.json.token}}' method=POST HEADER_Content-Type='application/json' body='{"token":"{{relogin_info.json.token}}","format":"{{nessus_report_format}}"}' validate_certs=no
+  register: file_info
+  tags: [ 'owm-nessus-client' ]
+
+- name: Wait for the scan report to be ready to download
+  pause: minutes=2
+  tags: [ 'owm-nessus-client' ]
+
+- name: Download the scan report
+  shell: 'curl -k -H ''X-Cookie: token={{relogin_info.json.token}}'' {{nessus_server_url}}/scans/{{scan_info.json.scan.id}}/export/{{file_info.json.file}}/download -o {{nessus_report_download_location}}/report.{{nessus_report_format}}'
+  tags: [ 'owm-nessus-client' ]

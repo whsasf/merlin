@@ -1,0 +1,37 @@
+ethernet_interfaces:
+ - device: eth0
+   vlan: admin
+   bootproto: static
+   address: 54.219.72.46
+   netmask: 255.255.252.0
+   gateway: 172.26.200.1
+ - device: eth0
+   vlan: service
+   bootproto: static
+   address: 54.219.72.46
+   netmask: 255.255.252.0
+ - device: eth0
+   vlan: storage
+   bootproto: static
+   address: 54.219.72.46
+   netmask: 255.255.252.0
+
+clusterId: cluster01
+elasticsearch_data_enabled: "true"
+cassandra_rack: RAC1  
+
+# The below is configured to run maintenance task
+queue_maintenance:
+   - minute: "1"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+# The below is configured to run backup mos
+mos_backup:
+   - minute: "0"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"

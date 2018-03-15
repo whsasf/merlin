@@ -1,0 +1,478 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="2.8" jmeter="2.13 r1665067">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="MTA" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">true</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <Arguments guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments">
+{% if groups['fep'] is defined %}
+{% for host in groups[node_site + '-fep'] %}
+{% if loop.index < 2 %}
+{% if hostvars[host]['ethernet_interfaces'] is defined %}
+{% for interface in hostvars[host]['ethernet_interfaces'] %}
+{% if interface['vlan'] is defined and interface['vlan'] == "access" %}
+             <elementProp name="g_MTAServerName" elementType="Argument">
+		<stringProp name="Argument.name">g_MTAServerName</stringProp>
+	        <stringProp name="Argument.value">{{ host + "-" + access_suffix }}</stringProp>
+		<stringProp name="Argument.metadata">=</stringProp>
+             </elementProp>
+	     <elementProp name="g_IMAPServerName" elementType="Argument">
+		<stringProp name="Argument.name">g_IMAPServerName</stringProp>
+		<stringProp name="Argument.value">{{ host + "-" + access_suffix }}</stringProp>        
+		<stringProp name="Argument.metadata">=</stringProp>
+	     </elementProp>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+            
+          <elementProp name="g_SmtpPort" elementType="Argument">
+            <stringProp name="Argument.name">g_SmtpPort</stringProp>
+            <stringProp name="Argument.value">25</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_AddressFrom" elementType="Argument">
+            <stringProp name="Argument.name">g_AddressFrom</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_mta[0].from_user_emailId }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_AddressTo" elementType="Argument">
+            <stringProp name="Argument.name">g_AddressTo</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_mta[0].to_user_emailId }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_ImapPort" elementType="Argument">
+            <stringProp name="Argument.name">g_ImapPort</stringProp>
+            <stringProp name="Argument.value">143</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_ImapProtocol" elementType="Argument">
+            <stringProp name="Argument.name">g_ImapProtocol</stringProp>
+            <stringProp name="Argument.value">imap</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_UserPass" elementType="Argument">
+            <stringProp name="Argument.name">g_UserPass</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_mta[0].from_username }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_UserName" elementType="Argument">
+            <stringProp name="Argument.name">g_UserName</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_mta[0].from_username }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_ImailUser" elementType="Argument">
+            <stringProp name="Argument.name">g_ImailUser</stringProp>
+            <stringProp name="Argument.value">{{ emailmx_user[0].username }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_User" elementType="Argument">
+            <stringProp name="Argument.name">g_User</stringProp>
+            <stringProp name="Argument.value">{{ jmeter_mta[0].from_username }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_UserHome" elementType="Argument">
+            <stringProp name="Argument.name">g_UserHome</stringProp>
+            <stringProp name="Argument.value">{{ emailmx_user[0].home }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_Domain_Name" elementType="Argument">
+            <stringProp name="Argument.name">g_Domain_Name</stringProp>
+            <stringProp name="Argument.value">{{ domain_name }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="g_Max_LImit" elementType="Argument">
+            <stringProp name="Argument.name">g_Max_LImit</stringProp>
+            <stringProp name="Argument.value">10</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="message" elementType="Argument">
+            <stringProp name="Argument.name">message</stringProp>
+            <stringProp name="Argument.value">/opt/merlin/jmeter/tests/common/message.txt</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+		  <elementProp name="g_Default_Mail_Quota" elementType="Argument">
+            <stringProp name="Argument.name">g_Default_Mail_Quota</stringProp>
+            <stringProp name="Argument.value">10000</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </Arguments>
+      <hashTree/>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Set mailquotatotkb to 10 KB in ldap" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1441146981000</longProp>
+        <longProp name="ThreadGroup.end_time">1441146981000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+{% if groups['fep'] is defined %}
+{% for host in groups[node_site + '-fep'] %}
+{% if loop.index < 2 %}
+        <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Set mailbox limit" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_IMAPServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_ImailUser} -c &apos;${g_UserHome}/bin/imdbcontrol sac ${g_User} ${g_Domain_Name} mailquotatotkb ${g_Max_LImit}&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+      </hashTree>
+{% endif %} 
+{% endfor %}
+{% endif %} 
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Send Thread Group" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">${g_Max_LImit}</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time"></stringProp>
+        <longProp name="ThreadGroup.start_time">1442404168000</longProp>
+        <longProp name="ThreadGroup.end_time">1442404168000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <SmtpSampler guiclass="SmtpSamplerGui" testclass="SmtpSampler" testname="Send Mail" enabled="true">
+          <stringProp name="SMTPSampler.server">${g_MTAServerName}</stringProp>
+          <stringProp name="SMTPSampler.serverPort">${g_SmtpPort}</stringProp>
+          <stringProp name="SMTPSampler.mailFrom">${g_AddressFrom}</stringProp>
+          <stringProp name="SMTPSampler.replyTo"></stringProp>
+          <stringProp name="SMTPSampler.receiverTo">${g_AddressTo}</stringProp>
+          <stringProp name="SMTPSampler.receiverCC"></stringProp>
+          <stringProp name="SMTPSampler.receiverBCC"></stringProp>
+          <stringProp name="SMTPSampler.subject">Test Mail</stringProp>
+          <stringProp name="SMTPSampler.suppressSubject">false</stringProp>
+          <stringProp name="SMTPSampler.include_timestamp">true</stringProp>
+          <stringProp name="SMTPSampler.message"></stringProp>
+          <stringProp name="SMTPSampler.plainBody">true</stringProp>
+          <stringProp name="SMTPSampler.attachFile">${message}</stringProp>
+          <stringProp name="SMTPSampler.useSSL">false</stringProp>
+          <stringProp name="SMTPSampler.useStartTLS">false</stringProp>
+          <stringProp name="SMTPSampler.trustAllCerts">false</stringProp>
+          <stringProp name="SMTPSampler.enforceStartTLS">false</stringProp>
+          <stringProp name="SMTPSampler.useLocalTrustStore">false</stringProp>
+          <stringProp name="SMTPSampler.trustStoreToUse"></stringProp>
+          <boolProp name="SMTPSampler.use_eml">false</boolProp>
+          <stringProp name="SMTPSampler.emlMessageToSend"></stringProp>
+          <stringProp name="SMTPSampler.useAuth">false</stringProp>
+          <stringProp name="SMTPSampler.password"></stringProp>
+          <stringProp name="SMTPSampler.username"></stringProp>
+          <stringProp name="SMTPSampler.messageSizeStatistics">false</stringProp>
+          <stringProp name="SMTPSampler.enableDebug">false</stringProp>
+          <collectionProp name="SMTPSampler.headerFields"/>
+        </SmtpSampler>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1442404298000</longProp>
+        <longProp name="ThreadGroup.end_time">1442404298000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <SmtpSampler guiclass="SmtpSamplerGui" testclass="SmtpSampler" testname="Send Mail" enabled="true">
+          <stringProp name="SMTPSampler.server">${g_MTAServerName}</stringProp>
+          <stringProp name="SMTPSampler.serverPort">${g_SmtpPort}</stringProp>
+          <stringProp name="SMTPSampler.mailFrom">${g_AddressFrom}</stringProp>
+          <stringProp name="SMTPSampler.replyTo"></stringProp>
+          <stringProp name="SMTPSampler.receiverTo">${g_AddressTo}</stringProp>
+          <stringProp name="SMTPSampler.receiverCC"></stringProp>
+          <stringProp name="SMTPSampler.receiverBCC"></stringProp>
+          <stringProp name="SMTPSampler.subject">Test Mail</stringProp>
+          <stringProp name="SMTPSampler.suppressSubject">false</stringProp>
+          <stringProp name="SMTPSampler.include_timestamp">true</stringProp>
+          <stringProp name="SMTPSampler.message"></stringProp>
+          <stringProp name="SMTPSampler.plainBody">true</stringProp>
+          <stringProp name="SMTPSampler.attachFile">${message}</stringProp>
+          <stringProp name="SMTPSampler.useSSL">false</stringProp>
+          <stringProp name="SMTPSampler.useStartTLS">false</stringProp>
+          <stringProp name="SMTPSampler.trustAllCerts">false</stringProp>
+          <stringProp name="SMTPSampler.enforceStartTLS">false</stringProp>
+          <stringProp name="SMTPSampler.useLocalTrustStore">false</stringProp>
+          <stringProp name="SMTPSampler.trustStoreToUse"></stringProp>
+          <boolProp name="SMTPSampler.use_eml">false</boolProp>
+          <stringProp name="SMTPSampler.emlMessageToSend"></stringProp>
+          <stringProp name="SMTPSampler.useAuth">false</stringProp>
+          <stringProp name="SMTPSampler.password"></stringProp>
+          <stringProp name="SMTPSampler.username"></stringProp>
+          <stringProp name="SMTPSampler.messageSizeStatistics">false</stringProp>
+          <stringProp name="SMTPSampler.enableDebug">false</stringProp>
+          <collectionProp name="SMTPSampler.headerFields"/>
+        </SmtpSampler>
+        <hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+            <stringProp name="ConstantTimer.delay">30000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+        </hashTree>
+{% if groups['fep'] is defined %}
+{% for host in groups[node_site + '-fep'] %}
+{% if loop.index < 2 %}
+        <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Check mta logs" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_MTAServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_ImailUser} -c &apos;grep -i MsLimitTotalSize64 ${g_UserHome}/log/mta.log&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+{% endif %} 
+{% endfor %}
+{% endif %} 
+        <hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+            <stringProp name="ConstantTimer.delay">30000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+        </hashTree>
+        <TCPSampler guiclass="TCPSamplerGui" testclass="TCPSampler" testname="11th message get bounced using imapserv" enabled="true">
+          <stringProp name="TCPSampler.server">${g_IMAPServerName}</stringProp>
+          <boolProp name="TCPSampler.reUseConnection">false</boolProp>
+          <stringProp name="TCPSampler.port">${g_ImapPort}</stringProp>
+          <boolProp name="TCPSampler.nodelay">false</boolProp>
+          <stringProp name="TCPSampler.timeout"></stringProp>
+          <stringProp name="TCPSampler.request">a login ${g_User} ${g_UserPass}
+a select inbox
+a fetch 11 rfc822
+a logout
+</stringProp>
+          <boolProp name="TCPSampler.closeConnection">false</boolProp>
+          <stringProp name="ConfigTestElement.username"></stringProp>
+          <stringProp name="ConfigTestElement.password"></stringProp>
+        </TCPSampler>
+        <hashTree>
+          <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+            <stringProp name="ConstantTimer.delay">30000</stringProp>
+          </ConstantTimer>
+          <hashTree/>
+        </hashTree>
+{% if groups['fep'] is defined %}
+{% for host in groups[node_site + '-fep'] %}
+{% if loop.index < 2 %}
+        <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Set default value to mail quota" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_IMAPServerName}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+  ((ChannelExec) channel).setCommand(&quot;runuser -l ${g_ImailUser} -c &apos;${g_UserHome}/bin/imdbcontrol sac ${g_User} ${g_Domain_Name} mailquotamaxmsgkb ${g_Default_Mail_Quota}&apos;&quot;);
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append("New system date: ");
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();
+</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree/>
+      </hashTree>
+{% endif %} 
+{% endfor %}
+{% endif %} 
+      <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>true</responseData>
+            <samplerData>false</samplerData>
+            <xml>true</xml>
+            <fieldNames>false</fieldNames>
+            <responseHeaders>true</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

@@ -1,0 +1,4 @@
+SERIAL NO.                       FAILED TEST CASE REPORT
+{% for  report in failed_test_cases.stdout_lines %}
+{{ loop.index }}                 {{ report }} 
+{% endfor %}

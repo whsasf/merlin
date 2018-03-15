@@ -1,0 +1,14 @@
+---
+- hosts: directory
+  roles:
+    - owm-queue-admin-configdb
+    - owm-queue-search-configdb
+
+- hosts: qadminsearch
+  roles:
+    - common
+    - jdk
+    - owm-common
+    - owm-elk-search
+    - owm-queue-admin
+    - owm-queue-search

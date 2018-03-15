@@ -1,0 +1,123 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-ldap', 'owm-functionaltest-imap', 'owm-functionaltest-pop', 'owm-functionaltest-mta', 'owm-functionaltest-mss', 'owm-functionaltest-cass', 'owm-functionaltest-nginx', 'owm-functionaltest-mos', 'owm-functionaltest-rg', 'owm-functionaltest-webtop' , 'test-user-creation', 'owm-functionaltest-queue' ]
+
+- name: Determine configuration server host
+  set_fact:
+      conf_server_name: "{{ hostvars[item]['ansible_ssh_host'] }}"
+  with_items: "{{ groups['directory'] }}"
+  when: "hostvars[item]['primary'] is defined"
+  tags: [ 'owm-functionaltest', 'test-user-creation' ]
+
+# Required by BeanSampler JMeter Module to use the SSH key to connect to remote server.
+- name: Determine current user home directory
+  set_fact:
+      current_user_home_dir: "{{ lookup('env','HOME') }}"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-ldap', 'owm-functionaltest-imap', 'owm-functionaltest-pop', 'owm-functionaltest-mta', 'owm-functionaltest-mss', 'owm-functionaltest-cass', 'owm-functionaltest-nginx', 'owm-functionaltest-mos', 'owm-functionaltest-rg', 'owm-functionaltest-queue' ]
+  
+- name: Create directory for jmeter package
+  file: path=/opt/merlin/jmeter state=directory
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-ldap', 'owm-functionaltest-imap', 'owm-functionaltest-pop', 'owm-functionaltest-mta', 'owm-functionaltest-mss', 'owm-functionaltest-cass', 'owm-functionaltest-nginx', 'owm-functionaltest-mos', 'owm-functionaltest-rg', 'owm-functionaltest-webtop', 'owm-functionaltest-queue' ]
+
+- name: Create directory for test cases
+  file: path=/opt/merlin/jmeter/tests state=directory
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-ldap', 'owm-functionaltest-imap', 'owm-functionaltest-pop', 'owm-functionaltest-mta', 'owm-functionaltest-mss', 'owm-functionaltest-cass', 'owm-functionaltest-nginx', 'owm-functionaltest-mos', 'owm-functionaltest-rg', 'owm-functionaltest-webtop', 'owm-functionaltest-queue' ]
+
+- name: Create directory for component specific test cases
+  file: path=/opt/merlin/jmeter/tests/{{ item }} state=directory
+  with_items:
+    - "common"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-pop', 'owm-functionaltest-mta', 'owm-functionaltest-imap' ]
+
+- name: Put other files required by test casses
+  copy: src={{ item.component }}/{{ item.file }} dest=/opt/merlin/jmeter/tests/{{ item.component }}/{{ item.file }}
+  with_items:
+    - { component: 'common', file: 'message.txt' }
+    - { component: 'common', file: '2mb.txt' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-pop', 'owm-functionaltest-mta', 'owm-functionaltest-imap' ]
+
+- name: Create users for JMeter Functional Testing
+  shell: "curl -k -X PUT 'http://{{conf_server_name}}:8081/mxos/mailbox/v2/{{item.email}}' -H 'Content-Type: application/x-www-form-urlencoded' -d  'email={{item.email}}&password={{item.password}}&cosId=default'"
+  with_items:
+    - { email: 'merlintestuser01@{{domain_name}}', password: 'merlintestuser01' }
+    - { email: 'merlintestuser02@{{domain_name}}', password: 'merlintestuser02' }
+    - { email: 'merlintestuser03@{{domain_name}}', password: 'merlintestuser03' }
+    - { email: 'merlintestuser04@{{domain_name}}', password: 'merlintestuser04' }
+    - { email: 'merlintestuser05@{{domain_name}}', password: 'merlintestuser05' }
+  tags: [ 'owm-functionaltest', 'test-user-creation' ]
+
+- name: Include only Directory JMeter test cases
+  include: functionaltests_directory.yml
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-ldap' ]
+
+- name: Include only IMAP JMeter test cases
+  include: functionaltests_imap.yml
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-imap' ]
+
+- name: Include only POP JMeter test cases
+  include: functionaltests_pop.yml
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-pop' ]
+
+- name: Include only MTA JMeter test cases
+  include: functionaltests_mta.yml
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mta' ]
+
+- name: Include only MSS JMeter test cases
+  include: functionaltests_mss.yml
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mss' ]
+
+- name: Include only Cassandra JMeter test cases
+  include: functionaltests_cassandra.yml
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-cassandra' ]
+
+- name: Include only NGINX JMeter test cases
+  include: functionaltests_nginx.yml
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-nginx' ]
+
+- name: Include only mOS JMeter test cases
+  include: functionaltests_mos.yml
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mos' ]
+
+- name: Include only RazorGate JMeter test cases
+  include: functionaltests_rg.yml
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-rg' ]
+  
+- name: Include only WebTop JMeter test cases
+  include: functionaltests_webtop.yml
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-webtop' ]
+  
+- name: Include only Queue JMeter test cases
+  include: functionaltests_queue.yml
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-queue' ]  
+
+- name: Check all the test case results
+  shell: grep -Ril "false" /opt/merlin/jmeter/reports/
+  register: failed_test_cases
+  failed_when: failed_test_cases.rc > 1
+  ignore_errors: True
+  changed_when: no
+  when: is_report_required
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-imap', 'owm-functionaltest-pop', 'owm-functionaltest-mta', 'owm-functionaltest-mss', 'owm-functionaltest-cass', 'owm-functionaltest-nginx', 'owm-functionaltest-mos', 'owm-functionaltest-rg', 'owm-functionaltest-webtop', 'owm-functionaltest-queue' ]
+
+- name: Generate the JMeter functional test cases report
+  template: src=functional_test_report.txt.j2 dest={{ playbook_dir }}/roles/owm-functionaltest/files/functional_test_report.txt
+  when: is_report_required
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-imap', 'owm-functionaltest-pop', 'owm-functionaltest-mta', 'owm-functionaltest-mss', 'owm-functionaltest-cass', 'owm-functionaltest-nginx', 'owm-functionaltest-mos', 'owm-functionaltest-rg', 'owm-functionaltest-webtop', 'owm-functionaltest-queue' ]
+
+- name: Send a mail to get the JMeter functional test cases report
+  local_action: mail
+                host='{{ report_server_info[0].host }}'
+                port={{ report_server_info[0].port }}
+                username={{ report_server_info[0].from_user }}
+                password={{ report_server_info[0].from_user_password }}
+                subject="MERLIN JMeter Report"
+                body="PFA. Functional test cases report"
+                from="{{ report_server_info[0].from_user }}"
+                to="{{ report_server_info[0].to_user }}"
+                attach="{{ playbook_dir }}/roles/owm-functionaltest/files/functional_test_report.txt"
+  when: is_report_required
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-imap', 'owm-functionaltest-pop', 'owm-functionaltest-mta', 'owm-functionaltest-mss', 'owm-functionaltest-cass', 'owm-functionaltest-nginx', 'owm-functionaltest-mos', 'owm-functionaltest-rg', 'owm-functionaltest-webtop', 'owm-functionaltest-queue' ]

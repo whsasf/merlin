@@ -1,0 +1,10 @@
+---
+- hosts: queue
+  roles:
+    - common
+    - jdk
+    - owm-common
+    - owm-msg-common
+    - owm-queue
+# Monitor UI is now a separate component that installs the agents it needs
+#    - owm-logstash-shipper

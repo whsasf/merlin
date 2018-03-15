@@ -1,0 +1,237 @@
+---
+- set_fact:
+   node_site: "{{ item }}"
+  with_items: sites
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: ['owm-razorgate']
+
+- name: Determine rgMasterHost and access network IP for Razorgate - couchbase mode
+  set_fact:
+   rgMasterHost: "{% set razrgtgrpname = node_site+'-smtpout' %}{% if groups[razrgtgrpname] is defined %}{% for host in groups[razrgtgrpname] %}{% if hostvars[host]['ethernet_interfaces'] is defined %}{% for interface in hostvars[host]['ethernet_interfaces'] %}{% if hostvars[host]['master'] is defined %}{% if interface['vlan'] is defined and interface['vlan'] == 'access' %}{{ interface['address'] }}{% endif %}{% endif %}{% endfor %}{% endif %}{% endfor %}{% endif %}"
+   rgAccessHost: "{% if hostvars[inventory_hostname]['ethernet_interfaces'] is defined %}{% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'access' %}{{ interface['address'] }}{% endif %}{% endfor %}{% endif %}"
+  tags: ['owm-razorgate']
+
+- name: Check if couchbase-server is installed
+  shell: rpm -qa | grep couchbase-server
+  register: COUCHBASE
+  failed_when: COUCHBASE.rc>1
+  ignore_errors: True
+  changed_when: no
+  tags: ['owm-razorgate']
+
+- name: Install the couchbase-server
+  shell: rpm -ivh {{owm_repo_url}}/{{couchbase_packagename}}-{{couchbase_arch}}.rpm 
+  when: COUCHBASE.rc != 0
+  tags: ['owm-razorgate']
+
+- name: Stop the couchbase-server
+  service: name=couchbase-server state=stopped enabled=yes
+  ignore_errors: True
+  tags: ['owm-razorgate']
+ 
+#
+# Handle Upgrade
+#
+
+# Check specific version
+- name: Get version of RPM
+  shell: "`which yum` list installed couchbase-server | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  changed_when: False
+  tags: ['owm-razorgate']
+  check_mode: no
+
+- debug:
+     msg: "System has couchbase-server version : {{rpm_version.stdout}} installed"
+  tags: ['owm-razorgate']
+
+# See which version is higher or lower
+- name: Compare installed RPM version with expected version
+  shell: '/tmp/compare_versions.sh {{couchbase_version}} {{rpm_version.stdout}}'
+  register: version_comparison
+  ignore_errors: yes
+  when: COUCHBASE.rc == 0
+  changed_when: False
+  tags: ['owm-razorgate']
+  check_mode: no
+
+- name: Print when no upgrade
+  debug:
+     msg: "Keeping the existing couchbase-server version : {{rpm_version.stdout}} installed"
+  when: COUCHBASE.rc == 0 and version_comparison.rc == 0
+  tags: ['owm-razorgate']
+  
+- name: Abort if couchbase for downgrade
+  meta: end_play
+  when: COUCHBASE.rc == 0 and version_comparison.rc == 2
+  check_mode: no
+
+# Try to catch the case that user specified a RPM package that is not in the {{owm_repo_url}}
+- name: Ensure {{owm_repo_url}} contains {{ couchbase_packagename }}-{{razorgate_version}} RPM
+  uri: 
+    url: "{{owm_repo_url}}/{{couchbase_packagename}}-{{couchbase_version}}-{{couchbase_arch}}.rpm"
+    method: HEAD
+    status_code: 200
+  register: rpmpkg_file
+  when: COUCHBASE.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  check_mode: no
+
+- debug: 
+     msg: "{{couchbase_packagename}}-{{couchbase_version}}-{{couchbase_arch}}.rpm is not found in {{owm_repo_url}}"
+  when: COUCHBASE.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+
+- name: Abort if the {{ couchbase_packagename }}-{{couchbase_version}} RPM  is missing
+  meta: end_play
+  when: COUCHBASE.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+  check_mode: no
+
+- debug: 
+     msg: "Do you want to continue the {{ couchbase_packagename }} upgrade from {{rpm_version.stdout}} to {{couchbase_version}} ?"
+  when: COUCHBASE.rc == 0 and version_comparison.rc == 1 
+
+- pause: seconds=30
+  when: COUCHBASE.rc == 0 and version_comparison.rc == 1
+  
+# If application is already installed, and is a lower version do an upgrade
+- name: Upgrade {{ couchbase_packagename }} from {{rpm_version.stdout}} to {{couchbase_version}}
+  shell: 'rpm --nodeps -Uvh {{owm_repo_url}}/{{couchbase_packagename}}-{{couchbase_version}}-{{couchbase_arch}}.rpm'
+  when: COUCHBASE.rc == 0 and version_comparison.rc == 1
+  tags: ['owm-razorgate']
+
+# Check specific version
+- name: Get new version of RPM
+  shell: "`which yum` list installed {{ couchbase_packagename }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: COUCHBASE.rc == 0
+  changed_when: False
+  tags: ['owm-razorgate']
+  check_mode: no
+
+- debug:
+     msg: "System has {{ couchbase_packagename }}-{{rpm_version.stdout}} installed (upgrade)"
+  when: COUCHBASE.rc == 0 and version_comparison.rc == 1
+  tags: ['owm-razorgate']
+
+- name: Fix the /etc/init.d/couchbase-server script by changing following line
+  lineinfile: dest=/etc/init.d/couchbase-server state=present regexp="--user couchbase" line="   daemon --check $DAEMON --user couchbase \"$DAEMON -- -noinput -detached > /opt/couchbase/var/lib/couchbase/logs/start.log 2>&1\""
+  tags: ['owm-razorgate']
+
+- name: Start the couchbase-server
+  service: name=couchbase-server state=started enabled=yes
+  tags: ['owm-razorgate']
+
+- include: init_razorgate.yml
+  tags: ['owm-razorgate']
+
+- name:  Install the RazorGate ({{razorgate_type}})
+  shell: 'rpm --nodeps -ih --prefix {{install_path}} {{owm_repo_url}}/razorgate-{{razorgate_version}}.x86_64.rpm'
+  when:  not ansible_check_mode and rpm_check.rc != 0
+  tags: ['owm-razorgate']
+
+- include: upgrade_razorgate.yml razorgate_upgrade_type={{razorgate_type}}
+  when:  not ansible_check_mode and rpm_check.rc == 0
+  tags: ['owm-razorgate']
+
+- include: start_razorgate.yml
+  when:  not ansible_check_mode
+  tags: ['owm-razorgate']
+
+- name: Enable the mgr
+  command: alternatives --install /usr/bin/mgr ow-mgr /opt/data/rg/mira/opt/criticalpath/global/bin/mgr 10000
+  tags: ['owm-razorgate']
+  
+- name: Pause for minute
+  pause: minutes=2
+  tags: ['owm-razorgate']
+
+- name: Configure the Master
+  command: mgr -p 7210 -s {{rgMasterHost}} -w p CONSOLE CONFIGURE GLOBAL ADD http://{{rgMasterHost}}:8091/pools ADMINUSERNAME=Administrator ADMINPASSWORD=secret MEMORYQUOTA=512 BUCKETNAME=cm-config BUCKETPASSWORD=secret BUCKETQUOTA=512
+  when: "hostvars[inventory_hostname]['master'] is defined"
+  tags: ['owm-configure-razorgate']
+  
+- name: Configure the RazorGate
+  command: mgr -p 7210 -s {{inventory_hostname + "-" + access_suffix}} -w p CONSOLE CONFIGURE GLOBAL ADD http://{{rgMasterHost}}:8091/pools ADMINUSERNAME=Administrator ADMINPASSWORD=secret MEMORYQUOTA=512 BUCKETNAME=cm-config BUCKETPASSWORD=secret BUCKETQUOTA=512
+  register: CONFRG
+  ignore_errors: true
+  failed_when: CONFRG.rc >1
+  tags: ['owm-configure-razorgate']
+  
+- name: Change the Admin password
+  command: mgr -p 7210 -s {{rgMasterHost}} -w p ADMIN MODIFY admin secret
+  when: "hostvars[inventory_hostname]['master'] is defined"
+  tags: ['owm-razorgate']
+  
+- name: Add the nodes
+  command: mgr -p 7210 -s {{rgMasterHost}} -w secret NODE ADD {{ inventory_hostname + "-" + access_suffix }} address={{rgAccessHost}}
+  tags: ['owm-razorgate']
+ 
+- name: Add the Cluster on master node
+  command: mgr -p 7210 -s {{rgMasterHost}} -w secret CLUSTER ADD {{ item.node_type }}
+  with_items:
+    - { node_type: 'out' }
+    - { node_type: 'in' }
+  when: "hostvars[inventory_hostname]['master'] is defined"
+  tags: ['owm-razorgate']
+  
+- name: Move the nodes on SMTP-OUT cluster
+  command: mgr -p 7210 -s {{rgMasterHost}} -w secret NODE MOVE {{ inventory_hostname + "-" + access_suffix }} cluster=out
+  when: "inventory_hostname in groups[node_site+'-smtpout']"
+  tags: ['owm-razorgate']
+  
+- name: Move the nodes on SMTP-IN cluster
+  command: mgr -p 7210 -s {{rgMasterHost}} -w secret NODE MOVE {{inventory_hostname + "-" + access_suffix }} cluster=in
+  when: "inventory_hostname in groups[node_site+'-smtpin']"
+  tags: ['owm-razorgate']
+
+- name: Configure dcounter for SMTP-OUT cluster
+  command: mgr -w secret -s {{rgMasterHost}} -p 7210 RGT SMTP SET dcountershosts={{inventory_hostname + "-" + access_suffix }} cluster=out
+  when: "inventory_hostname in groups[node_site+'-smtpout']"
+  tags: ['owm-razorgate']
+
+- name: Configure dcounter for SMTP-IN cluster
+  command: mgr -w secret -s {{rgMasterHost}} -p 7210 RGT SMTP SET dcountershosts={{inventory_hostname + "-" + access_suffix }} cluster=in
+  when: "inventory_hostname in groups[node_site+'-smtpin']"
+  tags: ['owm-razorgate']
+  
+- name: Relay for SMTP-OUT
+  command: mgr -w secret -s {{rgMasterHost}} -p 7210 RGT SMTP SET authenticationrequiredforrelaying=true cluster=out
+  when: "hostvars[inventory_hostname]['master'] is defined"
+  tags: ['owm-razorgate']
+  
+- name: Enable the RGT and SMTP
+  command: mgr -p 7210 -s {{rgMasterHost}} -w secret RGT SMTP SET MxEnabled=true CLUSTER={% if hostvars[inventory_hostname]['master'] is defined %}out{%else%}in{% endif%}
+  tags: ['owm-razorgate']
+   
+- name: Configure the out cluster
+  command: mgr -w secret -s {{rgMasterHost}} -p 7210 rgt smtp set ConfigDbPath={{emailmx_user[0].home}}/config/config.db cluster=out
+  when: inventory_hostname in groups['{{node_site}}-smtpin'] 
+  tags: ['owm-razorgate'] 
+  
+- name: Configure the in cluster
+  command: mgr -w secret -s {{rgMasterHost}} -p 7210 rgt smtp set ConfigDbPath={{emailmx_user[0].home}}/config/config.db cluster=in
+  when: inventory_hostname in groups['{{node_site}}-smtpin'] 
+  tags: ['owm-razorgate']
+
+- name: Get the SMTP-OUT node
+  set_fact:
+    local_configuration_host: "[{% if groups[node_site+'-smtpout'] is defined %}{% for host in groups[node_site+'-smtpout'] %}{% if hostvars[host]['node_id'] == hostvars[inventory_hostname]['node_id'] %}{% for interface in hostvars[host]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'access' %}'{{ interface['address'] }}'{% endif %}{% endfor %}{% endif %}{% endfor %}{% endif %}, '{{rgAccessHost}}']"
+  when: inventory_hostname in groups['{{node_site}}-smtpin']
+  tags: ['owm-razorgate']
+
+- name: Local Couchbase Configuration
+  command: mgr -p 7210 -s {{ item.node_ip_address1 }} -w secret CONSOLE CONFIGURE GLOBAL ADD http://{{ item.node_ip_address2 }}:8091/pools ADMINUSERNAME=Administrator ADMINPASSWORD=secret MEMORYQUOTA=512 BUCKETNAME=cm-config BUCKETPASSWORD=secret BUCKETQUOTA=512
+  with_items:
+    - { 'node_ip_address1' : '{{local_configuration_host[1]}}', 'node_ip_address2' : '{{local_configuration_host[1]}}' }
+    - { 'node_ip_address1' : '{{local_configuration_host[0]}}', 'node_ip_address2' : '{{local_configuration_host[1]}}' }
+  when: inventory_hostname in groups['{{node_site}}-smtpin']
+  tags: ['owm-razorgate']
+
+- name: Rebalance the Couchbase Servers
+  command: mgr -p 7210 -s {{rgMasterHost}} -w secret CONSOLE CONFIGURE GLOBAL GET REBALANCE PROGRESS
+  when: inventory_hostname in groups['{{node_site}}-smtpin']
+  tags: ['owm-razorgate']
+
+- name: Pause for 2 minutes
+  pause: minutes=2
+  tags: ['owm-razorgate']
+

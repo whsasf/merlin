@@ -1,0 +1,25 @@
+---
+- name: Create directories for RG
+  file: path=/opt/merlin/jmeter/{{ item }}/rg state=directory
+  with_items:
+    - "tests"
+    - "reports"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-rg' ]
+
+- name: Put test cases for RG
+  template: src=rg/{{ item.test_case }}.j2 dest=/opt/merlin/jmeter/tests/rg/{{ item.test_case }}
+  with_items:
+    - { test_case: 'Test_Start_Razorgate.jmx' }
+    - { test_case: 'Test_Status_Razorgate.jmx' }
+    - { test_case: 'Test_Stop_Razorgate.jmx' }  
+    - { test_case: 'Test_Send_Mail_Using_RG_MTA.jmx' }  
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-rg' ]
+
+- name: Execute JMeter test cases for RG
+  shell: /opt/merlin/jmeter/apache-jmeter-{{jmeter_version}}/bin/jmeter -n -t /opt/merlin/jmeter/tests/rg/{{ item.test }} -l /opt/merlin/jmeter/reports/rg/{{ item.report }}
+  with_items:
+    - { test: 'Test_Start_Razorgate.jmx', report: 'Report_Start_Razorgate.jtl' }
+    - { test: 'Test_Status_Razorgate.jmx', report: 'Report_Status_Razorgate.jtl' }
+    - { test: 'Test_Stop_Razorgate.jmx', report: 'Report_Stop_Razorgate.jtl' }
+    - { test: 'Test_Send_Mail_Using_RG_MTA.jmx', report: 'Report_Send_Mail_Using_RG_MTA.jtl' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-rg' ]

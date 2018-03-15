@@ -1,0 +1,162 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-mta','mx' ]
+
+- name: Check if owm-msg-common is installed
+  command: rpm -q owm-msg-common
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  changed_when: no
+  tags: [ 'owm-mta','mx' ]
+  check_mode: no
+
+- name: Check if owm-msg-mta is installed
+  command: rpm -q owm-msg-mta
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  tags: [ 'owm-mta','mx' ]
+  check_mode: no
+
+- name: Check if exim is installed
+  command: rpm -q exim
+  register: exim_check
+  failed_when: exim_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  tags: [ 'owm-mta','mx' ]
+  check_mode: no
+
+- name: Stop exim Process
+  service: name=exim state=stopped enabled=no
+  when: exim_check.rc == 0
+  tags: [ 'owm-mta','mx' ]
+
+- name: Fresh Install owm-msg-mta
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} GROUP_SITE={{node_site}} PORTS_OFFSET={{PORTSOFFSET}} rpm -ivh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-msg-mta-{{emailmx_version}}.el6.x86_64.rpm'
+  when: rpm_check.rc != 0
+  tags: [ 'owm-mta','mx' ]
+
+#
+# Handle Upgrade / Downgrade
+#
+
+- name: Set Package Name
+  set_fact: 
+    package_name: "owm-msg-mta"
+  tags: [ 'owm-mta','mx' ]
+
+# Check specific version
+- name: Get version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  changed_when: False
+  tags: [ 'owm-mta','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed"
+  tags: [ 'owm-mta','mx' ]
+
+# See which version is higher or lower
+- name: Compare installed RPM version with expected version
+  shell: '/tmp/compare_versions.sh {{emailmx_version}} {{rpm_version.stdout}}'
+  register: version_comparison
+  ignore_errors: yes
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-mta','mx' ]
+  check_mode: no
+
+- name: Print message when same version installed
+  debug:
+     msg: "Keeping the existing {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0 and version_comparison.rc == 0
+  tags: [ 'owm-mta','mx' ]
+
+# Try to catch the case that user specified a RPM package that is not in the {{owm_repo_url}}
+- name: Ensure {{owm_repo_url}} contains {{ package_name }}-{{emailmx_version}} RPM
+  uri: 
+    url: "{{owm_repo_url}}/{{ package_name }}-{{emailmx_version}}.el6.x86_64.rpm"
+    method: HEAD
+    status_code: 200
+  register: rpmpkg_file
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  check_mode: no
+
+- name: Print when package not found
+  debug: 
+     msg: "{{ package_name }}-{{emailmx_version}}.el6.x86_64.rpm is not found in {{owm_repo_url}}"
+  when: rpm_check.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+
+- name: Abort if the {{ package_name }}-{{emailmx_version}} RPM  is missing
+  meta: end_play
+  when: rpm_check.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+  check_mode: no
+
+- name: User confirmation for upgrade
+  debug: 
+     msg: "Do you want to continue the {{ package_name }} upgrade from {{rpm_version.stdout}} to {{emailmx_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1 
+
+- name: User confirmation for downgrade
+  debug: 
+     msg: "Do you want to continue the {{ package_name }} downgrade from {{rpm_version.stdout}} to {{emailmx_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2 
+
+- pause: seconds=3
+  when: rpm_check.rc == 0 and version_comparison.rc != 0
+ 
+- name: Stop MTA server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl stop mta'
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  tags: [ 'owm-mta','mx' ]
+
+# If application is already installed, and is a lower version do an upgrade
+- name: Upgrade {{ package_name }} from {{rpm_version.stdout}} to {{emailmx_version}}
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} GROUP_SITE={{node_site}} PORTS_OFFSET={{PORTSOFFSET}} rpm -Uvh --replacefiles --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-msg-mta-{{emailmx_version}}.el6.x86_64.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'owm-mta','mx' ]
+
+# If application is already installed, and is a higher version, downgrade
+# Downgrade Step #1 - remove old package
+- name: Downgrade Step 1, remove old {{ package_name }}-{{rpm_version.stdout}} package
+  shell: 'rpm -e {{ package_name }}-{{rpm_version.stdout}}'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-mta','mx' ]
+
+# Downgrade Step #2 - install older package
+- name: Downgrade Step 2, install older {{ package_name }}-{{emailmx_version}} package
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} GROUP_SITE={{node_site}} PORTS_OFFSET={{PORTSOFFSET}} rpm -ivh --replacefiles --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/{{ package_name }}-{{emailmx_version}}.el6.x86_64.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-mta','mx' ]
+
+# Check specific version
+- name: Get new version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-mta','mx' ]
+  check_mode: no
+
+- name: Print when upgraded
+  debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (upgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'owm-mta','mx' ]
+
+- name: Print when downgraded
+  debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (downgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-mta','mx' ]
+
+- include: mta_maintenance.yml
+  when: mx_maintenance
+  tags: [ 'owm-mta','maintenance' ]

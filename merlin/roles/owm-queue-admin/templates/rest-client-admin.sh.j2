@@ -1,0 +1,142 @@
+#!/bin/bash
+
+CURL=`which curl`
+PYTHON=`which python`
+RESTHOST=localhost
+RESTPORT={{queue_admin_port}}
+
+if [ -z "$CURL" ]; then
+	echo "No curl available"
+	exit 1
+fi
+
+help() {
+
+        echo "Usage:"
+        echo "$0 host <host> port <port> method list sort [sort] type [type] limit [limit] reverse [reverse]"
+        echo "$0 host <host> port <port> method get name <queue name>"
+        echo "$0 host <host> port <port> method clean name <queue name>"
+        echo "$0 host <host> port <port> method create name <queue name> type [type]"
+        echo "$0 host <host> port <port> method delete name <queue name>"
+        echo "$0 host <host> port <port> method disableEnqueue name <queue name>"
+        echo "$0 host <host> port <port> method enableEnqueue name <queue name>"
+        echo "$0 host <host> port <port> method disableDequeue name <queue name>"
+        echo "$0 host <host> port <port> method enableDequeue name <queue name>"
+        echo "$0 host <host> port <port> method recoverMessages"
+        echo "$0 host <host> port <port> method move source <source queue> destination <destination queue> messageids <comma separated list of message ids>"
+
+}
+
+while [ $# -gt 1 ]; do
+
+        case $1 in
+                host)
+                        shift
+                        RESTHOST=$1
+                        ;;
+                port)
+                        shift
+                        RESTPORT=$1
+                        ;;
+                method)
+                        shift
+                        METHOD=$1
+                        ;;
+                query)
+                		shift
+                		QUERY=$1
+                		;;
+                sort)
+                        shift
+                        SORT=$1
+                        ;;
+                type)
+                        shift
+                        TYPE=$1
+                        ;;
+                limit)
+                        shift
+                        LIMIT=$1
+                        ;;
+                reverse)
+                        shift
+                        REVERSE=$1
+                        ;;
+                name)
+                		shift
+                		NAME=$1
+                		;;
+                source)
+                		shift
+                		SOURCE=$1
+                		;;
+                destination)
+                		shift
+                		DESTINATION=$1
+                		;;
+                messageids)
+                		shift
+                		MESSAGEIDS=$1
+                		;;
+                *)
+                        help
+                        exit 1
+                        ;;
+        esac
+
+        shift
+done;
+
+CMD_ID=${RANDOM}
+
+case $METHOD in
+	get)
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueAdmin.'${METHOD}'", "params": { "name": "'${NAME}'" } }' 2>/dev/null)
+		;;
+	list)
+		if [ -z "${QUERY}" ]; then QUERY='*'; fi
+		if [ -z "${SORT}" ]; then SORT='count'; fi
+		if [ -z "${TYPE}" ]; then TYPE=''; fi
+		if [ -z "${LIMIT}" ]; then LIMIT=10; fi
+		if [ -z "${REVERSE}" ]; then REVERSE='false'; fi
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueAdmin.'${METHOD}'", "params": { "query": "'${QUERY}'", "sort": "'${SORT}'", "type": "'${TYPE}'", "limit": "'${LIMIT}'", "reverse": "'${REVERSE}'" } }' 2>/dev/null)
+		;;
+	clean)
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueAdmin.'${METHOD}'", "params": { "name": "'${NAME}'" } }' 2>/dev/null)
+		;;
+	create)
+		if [ -z "${TYPE}" ]; then TYPE=''; fi
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueAdmin.'${METHOD}'", "params": { "name": "'${NAME}'", "type": "'${TYPE}'" } }' 2>/dev/null)
+		;;
+	delete)
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueAdmin.'${METHOD}'", "params": { "name": "'${NAME}'" } }' 2>/dev/null)
+		;;
+	disableDequeue)
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueAdmin.'${METHOD}'", "params": { "name": "'${NAME}'" } }' 2>/dev/null)
+		;;
+	disableEnqueue)
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueAdmin.'${METHOD}'", "params": { "name": "'${NAME}'" } }' 2>/dev/null)
+		;;
+	enableDequeue)
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueAdmin.'${METHOD}'", "params": { "name": "'${NAME}'" } }' 2>/dev/null)
+		;;
+	enableEnqueue)
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueAdmin.'${METHOD}'", "params": { "name": "'${NAME}'" } }' 2>/dev/null)
+		;;
+	recoverMessages)
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueAdmin.'${METHOD}'", "params": { } }' 2>/dev/null)
+		;;
+	move)
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueAdmin.'${METHOD}'", "params": { "source": "'${SOURCE}'", "destination": "'${DESTINATION}'", "messageIds": ['${MESSAGEIDS}'] } }' 2>/dev/null)
+		;;
+	*)
+		help
+		exit 1
+		;;
+esac
+
+if [ -n "$PYTHON" ]; then
+	echo $CMD | python -m json.tool
+else
+	echo $CMD
+fi

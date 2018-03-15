@@ -1,0 +1,37 @@
+---
+- name: Take config.db file backup
+  command: 'tar -cf {{emailmx_user[0].home}}/conf-server-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz  -C {{emailmx_user[0].home}}/config config.db'
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-backup','confserv','confserv-backup' ]
+
+- name: Copy the conf server backup files into backup server
+  shell: 'rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{emailmx_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress {{emailmx_user[0].home}}/conf-server-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz root@{{backupserver_ip_address}}:{{backup_server_path}}'
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-backup','confserv','confserv-backup' ]
+
+- name: Delete backup file from source machine after copying on backup server
+  file: path={{emailmx_user[0].home}}/conf-server-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz state=absent
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-backup','confserv','confserv-backup' ]
+
+- name: Create directory to store script files
+  file: path={{emailmx_user[0].home}}/scripts state=directory mode=0755
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-backup','confserv','confserv-cronjob' ]
+
+- name: Configuration server backup script
+  template:
+    src: "confserv_backup.sh.j2"
+    dest: "{{emailmx_user[0].home}}/scripts/confserv_backup.sh"
+    owner: "{{emailmx_user[0].username}}"
+    group: "{{emailmx_user[0].username}}"
+    mode: 0644
+  tags: ['owm-backup','confserv','confserv-cronjob']
+
+- name: Create cron job for confserv backup
+  cron: name="Cron Job for confserv backup" user="{{emailmx_user[0].username}}" minute="{{confserv_backup[0].minute}}" hour="{{confserv_backup[0].hour}}" day="{{confserv_backup[0].day}}" month="{{confserv_backup[0].month}}" weekday="{{confserv_backup[0].weekday}}" job="bash {{emailmx_user[0].home}}/scripts/confserv_backup.sh 2> /dev/null 2>&1"
+  tags: ['owm-backup','confserv','confserv-cronjob']

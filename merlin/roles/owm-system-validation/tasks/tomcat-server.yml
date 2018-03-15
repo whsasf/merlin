@@ -1,0 +1,51 @@
+---
+- name: Create the tomcat server installation directory
+  file: path={{ tomcat_server_install_dir }} state=directory
+  tags: [ 'owm-system-validation' ]
+
+- name: Get the tomcat server tar file
+  get_url: url={{ owm_tar_url  }}/apache-tomcat-{{ tomcat_server_version }}.tar.gz dest={{ tomcat_server_install_dir }}
+  tags: [ 'owm-system-validation' ]
+    
+- name: Install tomcat server
+  unarchive: src={{ tomcat_server_install_dir  }}/apache-tomcat-{{ tomcat_server_version }}.tar.gz dest={{ tomcat_server_install_dir }} copy=no
+  tags: [ 'owm-system-validation' ]
+  
+- name: Configure tomcat server's CATALINA_PID environment variable
+  lineinfile: >
+     dest={{ tomcat_server_install_dir }}/apache-tomcat-{{ tomcat_server_version }}/bin/setenv.sh
+     create=yes
+     regexp="export CATALINA_PID="
+     line="export CATALINA_PID={{ tomcat_server_pid_file }}"
+     mode=0644
+     state=present
+  tags: [ 'owm-system-validation' ]
+
+- name: Ensure tomcat server configuration files are read-only
+  shell: find "{{ tomcat_server_install_dir }}"/apache-tomcat-{{ tomcat_server_version }}/conf -type f -print0 | xargs -0 --no-run-if-empty chmod -v 400
+  register: chmod_result
+  changed_when: "' changed ' in chmod_result.stdout"
+  tags: [ 'owm-system-validation' ]
+
+- name: Configure tomcat server http port
+  lineinfile: >
+     dest={{ tomcat_server_install_dir }}/apache-tomcat-{{ tomcat_server_version }}/conf/server.xml
+     regexp='^    <Connector port="\d+" protocol="HTTP/1\.1"\s*$'
+     line='    <Connector port="{{ tomcat_server_http_port }}" protocol="HTTP/1.1"'
+     mode=0600
+     state=present
+  tags: [ 'owm-system-validation' ]
+
+- name: Disable tomcat server shutdown port
+  lineinfile: >
+     dest={{ tomcat_server_install_dir }}/apache-tomcat-{{ tomcat_server_version }}/conf/server.xml
+     regexp="^<Server port=.*? shutdown=.*?>$"
+     line='<Server port="-1" shutdown="SHUTDOWN">'
+     mode=0600
+     state=present
+  tags: [ 'owm-system-validation' ]
+
+- name: Start the tomcat service
+  shell: '{{ tomcat_server_install_dir }}/apache-tomcat-{{ tomcat_server_version }}/bin/catalina.sh start'
+  ignore_errors: True
+  tags: [ 'owm-system-validation' ]

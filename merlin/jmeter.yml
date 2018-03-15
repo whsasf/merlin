@@ -1,0 +1,7 @@
+---
+- hosts: jmeter
+  roles:
+    - owm-repo
+    - jdk
+    - owm-jmeter
+    - owm-functionaltest

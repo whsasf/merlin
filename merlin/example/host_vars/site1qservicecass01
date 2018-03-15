@@ -1,0 +1,35 @@
+ethernet_interfaces:
+ - device: eth0
+   vlan: admin
+   bootproto: static
+   address: 10.49.0.133
+   netmask: 255.255.255.0
+   gateway: 10.49.0.1
+ - device: eth1
+   vlan: service
+   bootproto: static
+   address: 10.49.0.133
+   netmask: 255.255.255.0
+ - device: eth2
+   vlan: storage
+   bootproto: static
+   address: 10.49.0.133
+   netmask: 255.255.255.0
+cassandra_rack: RAC1  
+
+# The below is configured to run maintenance
+cassmeta_maintenance:
+   - minute: "0"
+     hour: "2"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+# The below is configured to run backup
+cassandra_backup:
+   - minute: "0"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"
+

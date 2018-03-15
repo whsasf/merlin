@@ -1,0 +1,31 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-affinity']
+
+- name: Determine cluster name
+  set_fact:
+    node_cluster: "{{ item }}"
+  with_items: "{{ clusters }}"
+  when: hostvars[inventory_hostname]['clusterId'] is defined and hostvars[inventory_hostname]['clusterId'] == "{{ item }}"
+  tags: [ 'owm-affinity']
+
+- include: centos6.yml
+  when: (ansible_distribution == "CentOS" and ansible_distribution_major_version == "6") or 
+        (ansible_distribution == "RedHat" and ansible_distribution_major_version == "6")
+  tags: [ 'owm-affinity']
+
+- include: centos7.yml
+  when: (ansible_distribution == "CentOS" and ansible_distribution_major_version == "7") or 
+        (ansible_distribution == "RedHat" and ansible_distribution_major_version == "7")
+  tags: [ 'owm-affinity']
+
+- pause: seconds=10 
+
+- name: Check pcs status
+  command: pcs status
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ node_cluster }}"
+  tags: ['owm-affinity']

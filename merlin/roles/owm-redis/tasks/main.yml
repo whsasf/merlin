@@ -1,0 +1,75 @@
+---
+- set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: ['owm-redis']
+
+- name: Installing/Upgrading remi repo
+  yum: name={{owm_repo_url}}/remi-release-6.rpm state=present
+  tags: ['owm-redis']
+
+- name: Installing Redis RPM
+  command: yum --enablerepo=remi install redis -y
+  tags: ['owm-redis']
+
+- name: Configuring /etc/redis.conf file for slave-read-only to no
+  lineinfile:
+    dest: /etc/redis.conf
+    state: present
+    regexp: '^slave-read-only'
+    line: 'slave-read-only no'
+    backrefs: yes
+    backup: yes
+  tags: ['owm-redis', 'redis-conf']
+
+- name: Configuring /etc/redis.conf file for bind to ANY
+  lineinfile:
+    dest: /etc/redis.conf
+    state: present
+    regexp: '^bind 127.0.0.1'
+    line: 'bind 0.0.0.0'
+    backrefs: yes
+    backup: yes
+  tags: ['owm-redis', 'redis-conf']
+
+- name: Configuring /etc/redis.conf file for the slaves
+  lineinfile:
+    dest: /etc/redis.conf
+    state: present
+    regexp: '^# slaveof <masterip> <masterport>'
+    line: "slaveof {% set redisgrpname = node_site+'-redis' %}{% if groups[redisgrpname] is defined %}{% for host in groups[redisgrpname] %}{% if hostvars[host]['master'] is defined %}{{hostvars[host]['ansible_ssh_host']}}{% endif %}{% endfor %}{% endif %} 6379"
+    backrefs: yes
+    backup: yes
+  when: "hostvars[inventory_hostname]['master'] is not defined"
+  tags: ['owm-redis', 'redis-conf']
+
+- name: Configuring /etc/redis-sentinel.conf file (monitor mymaster)
+  lineinfile:
+    dest: /etc/redis-sentinel.conf
+    state: present
+    regexp: '^sentinel monitor mymaster 127.0.0.1 6379 2'
+    line: "sentinel monitor mymaster {% set redisgrpname = node_site+'-redis' %}{% if groups[redisgrpname] is defined %}{% for host in groups[redisgrpname] %}{% if hostvars[host]['master'] is defined %}{{hostvars[host]['ansible_ssh_host']}}{% endif %}{% endfor %}{% endif %} 6379 2"
+    backrefs: yes
+    backup: yes
+  tags: ['owm-redis', 'redis-sentinel-conf']
+
+- name: Configuring /etc/redis-sentinel.conf
+  lineinfile:
+    dest: /etc/redis-sentinel.conf
+    state: present
+    line: "{{ item.line }}"
+    backup: yes
+  with_items:
+    - { line: "sentinel down-after-milliseconds mymaster 1000" }
+    - { line: "sentinel failover-timeout mymaster 2000" }
+    - { line: "sentinel parallel-syncs mymaster 1" }
+  tags: ['owm-redis', 'redis-sentinel-conf']
+
+- name: REDIS Service Start
+  service: name=redis state=started enabled=yes
+  tags: ['elkstart','owm-redis']
+
+- name: REDIS | Sentinel Start
+  service: name=redis-sentinel state=started enabled=yes
+  tags: ['elkstart','owm-redis']

@@ -1,0 +1,5 @@
+---
+tomcat_server_version: 7.0.61
+tomcat_server_install_dir: /opt/merlin
+tomcat_server_pid_file: "{{ tomcat_server_install_dir }}/apache-tomcat-{{ tomcat_server_version }}/bin/.pid"
+tomcat_server_http_port: 8080

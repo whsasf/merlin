@@ -1,0 +1,38 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-backup','setup' ]
+
+- name: Determine backup server ip
+  set_fact:
+      backupserver_ip_address: "{{ hostvars[item]['ansible_ssh_host'] }}"
+  with_items: "{{ groups[node_site+'-backupserver'] }}"
+  tags: [ 'owm-backup','setup' ]
+
+- name: Set timestamp variable
+  shell: date '+%Y%m%d_%H%M' 
+  register: timestamp 
+  tags: [ 'owm-backup','setup' ]
+
+- include: master_dirserv_backup.yml
+  when: inventory_hostname in groups['{{ node_site }}-directory'] and hostvars[inventory_hostname]['primary'] is defined
+  tags: [ 'owm-backup','dirserv' ]
+
+- include: confserv_backup.yml
+  when: inventory_hostname in groups['{{ node_site }}-directory'] and hostvars[inventory_hostname]['primary'] is defined
+  tags: [ 'owm-backup','confserv' ]
+
+- include: cassmeta_backup.yml
+  when: inventory_hostname in groups['{{ node_site }}-cassmeta']
+  tags: [ 'owm-backup','cassmeta' ]
+  
+- include: cassblob_backup.yml
+  when: inventory_hostname in groups['{{ node_site }}-cassblob']
+  tags: [ 'owm-backup','cassblob' ]  
+
+- include: mos_backup.yml
+  when: inventory_hostname in groups['{{ node_site }}-directory'] or inventory_hostname in groups['{{ node_site }}-queue']
+  tags: [ 'owm-backup','mos' ]

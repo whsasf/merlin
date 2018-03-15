@@ -1,0 +1,17 @@
+---
+- name: Cassandra Service Unit
+  template: 
+    src: "cassmeta.service.j2"
+    dest: /etc/systemd/system/cassmeta.service
+    mode: 0644
+  tags: [ 'owm-cassmeta', 'systemd-unit' ]
+    
+- name: Reload Daemon
+  shell: systemctl daemon-reload
+  sudo: yes
+  tags: [ 'owm-cassmeta', 'systemd-unit' ]
+    
+- name: Startup Cassandra Metadata
+  service: name=cassmeta state=started enabled=yes
+  tags: [ 'owm-cassmeta', 'owm-cassmeta-startup' ]
+

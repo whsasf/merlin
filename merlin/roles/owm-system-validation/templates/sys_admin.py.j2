@@ -1,0 +1,929 @@
+#!/usr/bin/env python
+import paramiko
+import os
+import subprocess
+import sys
+import re
+import fetch_data
+import generate_html
+import Queue
+import multiprocessing as mp
+from multiprocessing import Manager
+from datetime import datetime
+import time
+
+#ansible set to False if script is running on ansible mode it is changed to True
+ansible = False
+user_dir_path = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+full_path = user_dir_path + "/.ssh/id_rsa"
+
+if len(sys.argv) >1:
+	ansible_split = sys.argv[1].split("=")
+	if ansible_split[1].lower()=='true':
+		ansible = True
+		print "ansible", ansible
+	if ansible == True and len(sys.argv) == 6:
+		config_data_dict = {}
+		tomcat_path = sys.argv[2].split("=")
+		conf_server_ip = sys.argv[3].split("=")
+		config_data_dict.update({'tomcat_path': tomcat_path[1].rstrip('\r\n'),'conf_server_ip':conf_server_ip[1].rstrip('\r\n')})
+		mx_user_home = sys.argv[4].split("=")
+		cass_user_home = sys.argv[5].split("=")
+		config_data_dict.update({'mx_home':{'path':mx_user_home[1].rstrip('\r\n')},
+								 'mx_user_home':mx_user_home[1].rstrip('\r\n'),
+								 'MXOS':{'path':mx_user_home[1].rstrip('\r\n')},
+								 'CASSANDRA':{'path':cass_user_home[1].rstrip('\r\n')}
+								})
+	if ansible == True and len(sys.argv) < 6:
+		print "Please Configure all the Username and Password in the Script !!!"
+		sys.exit(1)
+	if ansible == True and len(sys.argv) > 6:
+		print "Please Check all the parameters passed to the Script !!!"
+		sys.exit(1)
+	if len(sys.argv) == 3 and ansible == False:
+		folder_path_split = sys.argv[2].split("=")
+		folder_path = folder_path_split[1]
+	if len(sys.argv) > 3 and ansible == False:
+		print "Please configure Folder Path Properly !!!"
+		sys.exit(1)
+	if len(sys.argv) < 3 and ansible == False:
+		print "Please configure Folder Path Properly !!!"
+		sys.exit(1)
+	if not os.path.exists(full_path):
+		print "Please provide file .ssh/id_rsa at: ", full_path
+		sys.exit(1)
+else:
+	print "Please provide path of configuration file"
+	sys.exit(1)
+##########---------------------------Get Configuration Data---------------------------------------#########
+
+def get_serverdata(folder_path):
+	"""get_serverdata Function is triggered on standalone mode.
+	This Function reads config file and generates a dictionary containing key-value pair of username and password for each component."""
+	host_config_data_dict = {}
+	try:
+		if os.path.exists(folder_path+'/host_info.txt'):
+			file = folder_path+'/host_info.txt'
+		if not os.path.exists(folder_path):
+			print "Please Configure Server Configuration in host_info.txt file"
+		with open(file,'r') as user_config_file:
+			for config_data in user_config_file:
+				user_pass_host_dict = {}
+				find_comment = re.findall(r'#', config_data)
+				if find_comment:
+					continue
+				hostname = config_data.split(" ")
+				if hostname[0] == "APPSUITE":
+					user_pass_host_dict.update({"username":hostname[1].rstrip('\n'),"password":hostname[2].rstrip('\n'),"app_suite_path":hostname[3].rstrip('\n'),"profile_username":hostname[4].rstrip('\n'),"profile_password":hostname[5].rstrip('\n')})
+				elif hostname[0] == "HOSTDATA":
+					user_pass_host_dict.update({"hostname":hostname[1].rstrip('\n'),"username":hostname[2].rstrip('\n'),"password":hostname[3].rstrip('\n'),"config_path":hostname[4].rstrip('\n')})
+				elif hostname[0] == "TOMCAT":
+					user_pass_host_dict.update({"hostname":hostname[1].rstrip('\n'),"username":hostname[2].rstrip('\n'),"password":hostname[3].rstrip('\n'),"tomcat_path":hostname[4].rstrip('\n')})
+				elif hostname[0] == "MXOS_OTHER":
+					user_pass_host_dict.update({"username":hostname[1].rstrip('\n'),"password":hostname[2].rstrip('\n')})	
+				else :
+					user_pass_host_dict.update({"username":hostname[1].rstrip('\n'),"password":hostname[2].rstrip('\n'),"profile_username":hostname[3].rstrip('\n'),"profile_password":hostname[4].rstrip('\n')})
+				host_config_data_dict.update({hostname[0]:user_pass_host_dict})
+			return host_config_data_dict
+	except:
+		print "Exception found While Getting Configuration Data"
+		print sys.exc_info()
+		
+##########---------------------------HOST Data---------------------------------------#########
+if ansible==False:
+	config_data_dict = get_serverdata(folder_path)
+	hostname = config_data_dict['HOSTDATA']['hostname']
+	username = config_data_dict['HOSTDATA']['username']
+	password = config_data_dict['HOSTDATA']['password']
+	config_path = config_data_dict['HOSTDATA']['config_path']
+
+elif ansible==True:
+	hostname = config_data_dict['conf_server_ip']
+	#print "hostname in ansible True..", hostname
+	username = ''
+	password = ''
+	mx_user_home = config_data_dict['mx_user_home']
+	config_path = mx_user_home+'/config/config.db'
+	
+def get_hostnames(hostname,username,password,config_path):
+	"""get_hostnames Function is triggered on Ansible and Standalone mode.
+	   This Function connects to conf server IP=hostname, with Username and Password fetched from config file in case of standalone mode 
+	   or read from group_vars/all file, This Function Reads config.db and Returns List of Servers for each component in a dict"""
+	res_dict = {}
+	hostnames_mss_run = []
+	hostnames_mta_run = []
+	hostnames_imap = []
+	hostnames_pop = []
+	hostnames_sec_master = []
+	hostnames_imqueue = []
+	hostnames_imext = []
+	hostnames_imdir = []
+	hostnames_immgr = []
+	hostnames_imconf = []
+	hostnames_imdircache = []
+	hostnames_mxos = []
+	hostnames_cass_meta = []
+	hostnames_cass_blob = []
+	hostnames_nginx = []
+	mta_spooldir_path = []
+	ssh = paramiko.SSHClient()
+	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+	paramiko.util.log_to_file("python_connect.log")
+	try:
+		if ansible==False:
+			ssh.connect(hostname, username=username,password=password)
+		elif ansible==True:
+			ssh.connect(hostname, username='root', key_filename=full_path)
+		mx_comp = ['mta_run','mss_run','imapserv_run','popserv_run','imqueueserv_run','imextserv_run','imdirserv_run','immgrserv_run','imconfserv_run','imdircacheserv_run']
+		for comp in mx_comp:
+			stdin, stdout, stderr =  ssh.exec_command("cat "+config_path+" | grep "+comp+" | grep on | awk -F/ '{print $2}'")
+			hostnames_comp = []
+			res_mx = stdout.readlines()
+			for line in res_mx:
+				line_comma_split_mx = line.split(",")
+				if len(line_comma_split_mx) > 1:
+					for ip in line_comma_split_mx:
+						hostnames_comp.append(ip.rstrip('\r\n'))
+				else:
+					hostnames_comp.append(line.rstrip('\r\n'))
+			res_dict.update({comp:hostnames_comp})
+			#print "comp******", comp, "------>", hostnames_comp
+		
+		stdin, stdout, stderr =  ssh.exec_command("cat "+config_path+" | grep  MTASpool | awk -F[ '{print $2}' | awk -F] '{print $1}'")
+		res_mta_spool = stdout.readlines()
+		for line in res_mta_spool:
+			line_comma_split_mta_spool = line.split(",")
+			if len(line_comma_split_mta_spool) > 1:
+				for ip in line_comma_split_mta_spool:
+					mta_spooldir_path.append(ip.rstrip('\r\n'))
+			else:
+				mta_spooldir_path.append(line.rstrip('\r\n'))
+		res_dict.update({'mta_spool_Dirpath':mta_spooldir_path})
+		
+		stdin, stdout, stderr =  ssh.exec_command("cat "+config_path+" | grep masterServerRole | grep 2 | awk -F/ '{print $2}'")
+		res_sec_master = stdout.readlines()
+		for line in res_sec_master:
+			line_comma_split_sec_master = line.split(",")
+			if len(line_comma_split_sec_master) > 1:
+				for ip in line_comma_split_sec_master:
+					hostnames_sec_master.append(ip.rstrip('\r\n'))
+			else:
+				hostnames_sec_master.append(line.rstrip('\r\n'))
+		res_dict.update({'masterServerRole':hostnames_sec_master})
+		
+		stdin, stdout, stderr =  ssh.exec_command("cat "+config_path+" | grep on | grep mxos_run | awk '{print $1}' | awk -F/ '{print $2}' | awk -F/ '{print $1}'")
+		res_mxos = stdout.readlines()
+		if res_mxos:
+			for line in res_mxos:
+				line_comma_split_mxos = line.split(",")
+				if len(line_comma_split_mxos) > 1:
+					for ip in line_comma_split_mxos:
+						hostnames_mxos.append(ip.rstrip('\r\n'))
+				else:
+					hostnames_mxos.append(line.rstrip('\r\n'))
+		
+		else :
+			stdin, stdout, stderr =  ssh.exec_command("cat "+config_path+" | grep mxosHttpHostname | awk '{print $2}' | awk -F[ '{print $2}' | awk -F] '{print $1}'")
+			res_mxos = stdout.readlines()
+			for line in res_mxos:
+				line_comma_split_mxos = line.split(",")
+				if len(line_comma_split_mxos) > 1:
+					for ip in line_comma_split_mxos:
+						hostnames_mxos.append(ip.rstrip('\r\n'))
+				else:
+					hostnames_mxos.append(line.rstrip('\r\n'))
+		res_dict.update({'mxos':hostnames_mxos})
+		
+		exp = '"'+'='+'"'
+		cmd = "cat "+config_path+" | grep -A5 'cassandraMDCluster:'  | sed '1!b;s/\//replace/' | grep -v '^\/' | grep -v "+exp+" | awk -F[ '{print $2}' | awk -F] '{print $1}'"
+		stdin, stdout, stderr =  ssh.exec_command(cmd)
+		res_meta = stdout.readlines()
+		if not res_meta:
+			stdin, stdout, stderr =  ssh.exec_command("cat "+config_path+" | grep cassandraMDCluster | grep on | awk -F[ '{print $2}' | awk -F] '{print $1}'")	
+			res_meta = stdout.readlines()
+			#print "res_meta Inside",res_meta
+		for line in res_meta:
+			line_comma_split_meta = line.split(",")
+			if len(line_comma_split_meta) > 1:
+				for ip in line_comma_split_meta:
+					# print "ip", ip
+					hostnames_cass_meta.append(ip.rstrip('\r\n'))
+			else:
+				hostnames_cass_meta.append(line.rstrip('\r\n'))
+		res_dict.update({'cass_meta':hostnames_cass_meta})
+		
+		blob_cmd = "cat "+config_path+" | grep -A5 blobtier= | sed '1!b;s/\//replace/' | grep -v '^\/' | awk -F= '{print $2}' | awk -F: '{print $2}'"
+		stdin, stdout, stderr =  ssh.exec_command(blob_cmd)
+		res_blob = stdout.readlines()
+		for line in res_blob:
+			line_comma_split_blob = line.split(",")
+			if len(line_comma_split_blob) > 1:
+				for ip in line_comma_split_blob:
+					hostnames_cass_blob.append(ip.rstrip('\r\n'))
+			else:
+				hostnames_cass_blob.append(line.rstrip('\r\n'))
+		res_dict.update({'cass_blob':hostnames_cass_blob})
+		
+		stdin, stdout, stderr =  ssh.exec_command("cat "+config_path+" | grep messageStoreHosts | awk '{print $2}' | awk -F[ '{print $2}' |awk -F] '{print $1}'")
+		res_nginx = stdout.readlines()
+		print "Nginx IPS....", res_nginx
+		for line in res_nginx:
+			line_comma_split_nginx = line.split(",")
+			if len(line_comma_split_nginx) > 1:
+				for ip in line_comma_split_nginx:
+					hostnames_nginx.append(ip.rstrip('\r\n'))
+			else:
+				hostnames_nginx.append(line.rstrip('\r\n'))
+		res_dict.update({'nginx':hostnames_nginx})
+
+	except:
+		print "Exception found"
+		print sys.exc_info()
+	return res_dict
+	ssh.close()
+
+def replace_dot(data):
+	data_replace = str (data).replace('.','')
+	return data_replace
+	
+def get_hostips(hostname,username,password,config_path,hostnames):
+	"""get_hostips Function is triggered on Ansible and Standalone mode.
+	   This Function reads etc/hosts file of conf server and Returns IP address for each hostname"""
+	res_dict = {}
+	ssh = paramiko.SSHClient()
+	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+	paramiko.util.log_to_file("python_connect.log")
+	try:
+		if ansible==False:
+			ssh.connect(hostname, username=username,password=password)
+		elif ansible==True:
+			ssh.connect(hostname, username='root', key_filename=full_path)
+		hostnames_keys = hostnames.keys()
+		for each_host in hostnames_keys:
+			hostip_list = []
+			hostnames_list = hostnames[each_host]	
+			for host in hostnames_list:
+				host_split = replace_dot(host)
+				if host_split.isdigit() == True:
+					host_ip = host.rstrip('\r\n')
+					hostip_list.append(host_ip)
+				elif host_split.isdigit() == False:
+					if (host == "blobcluster" or host == "metacluster"):
+						casscmd = "cat /etc/hosts |  grep -w %s | awk '{print $2}'" %(host)
+						stdin, stdout, stderr = ssh.exec_command(casscmd)
+						casshostlist = stdout.readlines()
+						for casshost in casshostlist:
+							casshostStrings = casshost.split("-")
+							cmd = "cat /etc/hosts |  grep adm | grep -w %s | awk '{print $1}'" %(casshostStrings[0])
+							stdin, stdout, stderr =  ssh.exec_command(cmd)
+							host_ips = stdout.readlines()
+							if host_ips:
+								for host_ip in host_ips:
+									host_ip = host_ip.rstrip('\r\n')
+									host_ip_split = replace_dot(host_ip)
+									if host_ip_split.isdigit() == True:
+										hostip_list.append(host_ip)
+									elif host_ip_split.isdigit() == False:
+										cmd = "cat /etc/hosts | grep -w %s | awk '{print $2}'" %(host)
+										stdin, stdout, stderr =  ssh.exec_command(cmd)
+										host_ips_cass = stdout.readlines()
+										for host_ip_cass in host_ips_cass:
+											host_ip_cass = host_ip_cass.rstrip('\r\n')
+											hostip_list.append(host_ip_cass)
+					elif (host != "blobcluster" and host != "metacluster"):
+						cmd = "cat /etc/hosts |  grep adm | grep -w %s | awk '{print $1}'" %(host)
+						stdin, stdout, stderr =  ssh.exec_command(cmd)
+						host_ips = stdout.readlines()
+						if host_ips:
+							for host_ip in host_ips:
+								host_ip = host_ip.rstrip('\r\n')
+								host_ip_split = replace_dot(host_ip)
+								if host_ip_split.isdigit() == True:
+									hostip_list.append(host_ip)
+								elif host_ip_split.isdigit() == False:
+									cmd = "cat /etc/hosts | grep -w %s | awk '{print $2}'" %(host)
+									stdin, stdout, stderr =  ssh.exec_command(cmd)
+									host_ips_cass = stdout.readlines()
+									for host_ip_cass in host_ips_cass:
+										host_ip_cass = host_ip_cass.rstrip('\r\n')
+										hostip_list.append(host_ip_cass)
+			
+			if hostip_list:
+				hostip_list = list(set(hostip_list))
+				print "hostip_list*******",hostip_list," For ",each_host
+				res_dict.update({each_host:hostip_list})
+	except:
+		print "Exception found"
+		print sys.exc_info() , "get_hostips"
+	return res_dict
+	ssh.close()
+	
+def get_hostips_appsuite_mysql(mxos_hostname,config_data_dict):
+	"""get_hostips_appsuite_mysql Function is triggered on Ansible and Standalone mode.
+	   This Function connects to mxos server and reads .properties file to fetch App Suite and MYSQL DB server IP"""
+	res_dict = {}
+	hostips_app_suite = []
+	hostips_mysql = []
+	ssh = paramiko.SSHClient()
+	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+	paramiko.util.log_to_file("python_connect.log")
+	
+	if ansible==False:
+		ssh.connect(hostname, username=username,password=password)
+	elif ansible==True:
+		ssh.connect(hostname, username='root', key_filename=full_path)
+	if ansible==False:
+		cmd = "cat $HOME/config//mxos.properties | grep -i oxHttpURL |awk -F// '{print $2}' | awk -F/ '{print $1}'"
+	elif ansible==True:
+		cmd = "cat "+config_data_dict['MXOS']['path']+"/mxos/config//mxos.properties | grep -i oxHttpURL |awk -F// '{print $2}' | awk -F/ '{print $1}'"
+	stdin, stdout, stderr =  ssh.exec_command(cmd)
+	app_suite_res = stdout.readlines()
+	if app_suite_res:
+		for line in app_suite_res:
+			hostips_app_suite.append(line.rstrip('\r\n'))
+		res_dict.update({'app_suite':hostips_app_suite})
+	
+	if ansible==False:
+		cmd = "cat $HOME/config//mxos.properties | grep -i oxMySQLURL |awk -F// '{print $2}'  | awk -F: '{print $1}'"
+	elif ansible==True:
+		cmd = "cat "+config_data_dict['MXOS']['path']+"/mxos/config//mxos.properties | grep -i oxMySQLURL |awk -F// '{print $2}'  | awk -F: '{print $1}'"
+	stdin, stdout, stderr =  ssh.exec_command(cmd)
+	mysqldb_res = stdout.readlines()
+	if mysqldb_res:
+		for line in mysqldb_res:
+			hostips_mysql.append(line.rstrip('\r\n'))
+		res_dict.update({'mysqlDB':hostips_mysql})
+				
+	return res_dict
+	ssh.close()
+
+def put_file(machinename, username, dirname, filename, data,tomcat_password,ansible):
+	"""put_file Function is triggered on Ansible and standalone mode.
+	   This Function connects to Tomcat Machine with username and password fetched from config DB and puts HTML files there at specified tomcat path"""
+	ssh = paramiko.SSHClient()
+	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+	if ansible==False:
+		ssh.connect(machinename, username=tomcat_username, password=tomcat_password)
+	elif ansible==True:
+		ssh.connect(machinename, username='root', key_filename=full_path)
+	try:
+		sftp = ssh.open_sftp()
+		sftp.mkdir(dirname)
+	except IOError:
+		pass
+	
+	f = sftp.open(dirname + '/' + filename, 'w')
+	f.write(data)
+	f.close()
+	ssh.close()
+	
+def put_file_ansible(dirname, filename, data):
+	"""put_file_ansible Function is triggered on Ansible and standalone mode.
+	   This Function connects to Tomcat Machine with username and password fetched from config DB and puts HTML files there at specified tomcat path"""
+	try:
+		if not os.path.isdir(dirname):
+			p = os.mkdir( dirname, 0755 )
+		file_path = dirname+"/"+filename
+		print "file_path", file_path
+		f = open(file_path, "w")
+		f.write(data)
+		f.close()
+	except IOError:
+		print "Couldn't copy files to Tomcat Host Machine!!!"
+		sys.exit(1)
+	
+#Calling get_hostnames
+hostnames = get_hostnames(hostname,username,password,config_path)
+#Calling get_hostips passing hostnames
+host_ips = get_hostips(hostname,username,password,config_path,hostnames)
+mgr_mxos_ips_list = []
+if host_ips.has_key('mxos'):
+	mxos_ips = host_ips['mxos']
+	if host_ips.has_key('immgrserv_run'):
+		for ip in host_ips['immgrserv_run']:
+			if ip in mxos_ips:
+				mgr_mxos_ips_list.append(ip)
+	if mxos_ips:
+		app_suite_mysql_data = get_hostips_appsuite_mysql(host_ips['mxos'][0],config_data_dict)
+		for data in app_suite_mysql_data.keys():
+			data_list = app_suite_mysql_data[data]
+			for vals in data_list:
+				vals = vals.rstrip('\r\n')
+				if vals=='localhost':
+					app_suite_mysql_data[data].remove('localhost')
+		if app_suite_mysql_data.keys():
+			host_ips.update(get_hostips(hostname,username,password,config_path,app_suite_mysql_data))
+	
+hostnames_keys = host_ips.keys()
+for each_host in hostnames_keys:
+	print "hostnames[each_host]", host_ips[each_host], "for" , each_host
+	if host_ips[each_host] == '':
+		del host_ips[each_host]
+
+# ************************************************** Process Implementation *****************************************************************	
+manager = Manager()
+if hostnames.has_key('mta_spool_Dirpath'):
+	config_data_dict.update({'mta_spool_Dirpath':hostnames['mta_spool_Dirpath']})
+
+if host_ips.has_key('mta_run'):
+	queue1 = manager.Queue()
+	p1 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['mta_run'],config_data_dict,'MTA',queue1,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('imapserv_run'):
+	queue2 = manager.Queue()
+	p2 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['imapserv_run'],config_data_dict,'IMAP',queue2,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('popserv_run'):
+	queue3 = manager.Queue()
+	p3 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['popserv_run'],config_data_dict,'POP',queue3,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('mss_run'):
+	queue4 = manager.Queue()
+	p4 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['mss_run'],config_data_dict,'MSS',queue4,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('mxos'):
+	queue5 = manager.Queue()
+	p5 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['mxos'],config_data_dict,'MXOS',queue5,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('app_suite'):
+	queue6 = manager.Queue()
+	p6 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['app_suite'],config_data_dict,'APPSUITE',queue6,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('cass_meta'):
+	queue7 = manager.Queue()
+	p7 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['cass_meta'],config_data_dict,'CASSANDRA',queue7,ansible,mgr_mxos_ips_list,'meta'))
+
+if host_ips.has_key('cass_blob'):
+	queue8 = manager.Queue()
+	p8 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['cass_blob'],config_data_dict,'CASSANDRA',queue8,ansible,mgr_mxos_ips_list,'blob'))
+
+if host_ips.has_key('mysqlDB'):
+	queue9 = manager.Queue()
+	p9 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['mysqlDB'],config_data_dict,'MYSQLDB',queue9,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('nginx'):
+	print "NGINX PROCESSSSSSSSS  host_ips['nginx']", host_ips['nginx']
+	queue10 = manager.Queue()
+	p10 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['nginx'],config_data_dict,'NGINX',queue10,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('imqueueserv_run'):
+	queue11 = manager.Queue()
+	p11 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['imqueueserv_run'],config_data_dict,'IMQUEUESERV',queue11,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('imextserv_run'):
+	queue12 = manager.Queue()
+	p12 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['imextserv_run'],config_data_dict,'IMEXTSERV',queue12,ansible,mgr_mxos_ips_list,''))
+	
+if host_ips.has_key('imdirserv_run'):
+	queue13 = manager.Queue()
+	p13 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['imdirserv_run'],config_data_dict,'IMDIRSERV',queue13,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('imconfserv_run'):
+	queue15 = manager.Queue()
+	p15 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['imconfserv_run'],config_data_dict,'IMCONFSERV',queue15,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('imdircacheserv_run'):
+	queue16 = manager.Queue()
+	p16 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['imdircacheserv_run'],config_data_dict,'IMDIRCACHESERV',queue16,ansible,mgr_mxos_ips_list,''))
+
+if host_ips.has_key('masterServerRole'):
+	queue17 = manager.Queue()
+	p17 = mp.Process(target=fetch_data.call_gen_commands, args=(host_ips['masterServerRole'],config_data_dict,'IMDIRSERVSEC',queue17,ansible,mgr_mxos_ips_list,''))
+
+# # ************************************************** Process Implementation Start() Process *****************************************************************
+if host_ips.has_key('mta_run'):
+	p1.start()
+	print "Process 1 Started at ", datetime.now()
+if host_ips.has_key('imapserv_run'):
+	p2.start()
+	print "Process 2 Started at ", datetime.now()
+if host_ips.has_key('popserv_run'):
+	p3.start()
+	print "Process 3 Started at ", datetime.now()
+if host_ips.has_key('mss_run'):
+	p4.start()
+	print "Process 4 Started at ", datetime.now()
+if host_ips.has_key('mxos'):
+	p5.start()
+	print "Process 5 Started at ", datetime.now()
+if host_ips.has_key('app_suite'):
+	p6.start()
+	print "Process 6 Started at ", datetime.now()
+if host_ips.has_key('cass_meta'):
+	p7.start()
+	print "Process 7 Started at ", datetime.now()
+if host_ips.has_key('cass_blob'):
+	p8.start()
+	print "Process 8 Started at ", datetime.now()
+if host_ips.has_key('mysqlDB'):
+	p9.start()
+	print "Process 9 Started at ", datetime.now()
+if host_ips.has_key('nginx'):
+	print "NGINX Starting"
+	p10.start()
+	print "Process 10 Started at ", datetime.now()
+if host_ips.has_key('imqueueserv_run'):
+	p11.start()
+	print "Process 11 Started at ", datetime.now()
+if host_ips.has_key('imdirserv_run'):
+	p13.start()
+	print "Process 13 Started at ", datetime.now()
+
+print "Before Sleep-------------------------------------------------------------------"
+time.sleep(2)
+print "Before Sleep-------------------------------------------------------------------"
+
+if host_ips.has_key('imconfserv_run'):
+	p15.start()
+	print "Process 15 Started at ", datetime.now()
+if host_ips.has_key('imdircacheserv_run'):
+	p16.start()
+	print "Process 16 Started at ", datetime.now()
+if host_ips.has_key('masterServerRole'):
+	p17.start()
+	print "Process 17 Started at ", datetime.now()
+
+if host_ips.has_key('imextserv_run'):
+	p12.start()
+	print "Process 12 Started at ", datetime.now()
+
+res_1=res_2=res_3=res_4=res_5=res_6=res_7=res_8=res_9=res_10=res_11=res_12=res_13=res_14=res_15=res_16=res_17={}
+
+if ansible==False:
+	tomcat_hostname = config_data_dict['TOMCAT']['hostname']
+	tomcat_username = config_data_dict['TOMCAT']['username']
+	tomcat_password = config_data_dict['TOMCAT']['password']
+	tomcat_path = config_data_dict['TOMCAT']['tomcat_path']
+	
+	
+elif ansible==True:
+	
+	tomcat_hostname = ''
+	tomcat_username = ''
+	tomcat_password = ''
+	tomcat_path = config_data_dict['tomcat_path']
+
+res1_html_dict = {}
+
+if host_ips.has_key('mta_run'):
+	p1.join()
+	res_1 = queue1.get()
+	try:
+		if res_1.keys():
+			for key in res_1.keys():
+				print "GENERATING MTA HTML"
+				gen_mta_html = generate_html.gen_mta_html(res_1[key],key)
+				res1_html_dict.update({key:'mta_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'mta_'+key+'.html', gen_mta_html,tomcat_password,ansible)
+				elif ansible==True:
+					print "Printing HTML"
+					put_file_ansible(tomcat_path, 'mta_'+key+'.html', gen_mta_html)
+		res_1.clear()
+	except:
+		print "Exception found While Generating MTA HTML"
+		print sys.exc_info()
+
+res2_html_dict = {}
+
+if host_ips.has_key('imapserv_run'):
+	p2.join()
+	res_2 = queue2.get()
+	try:
+		if res_2.keys():
+			for key in res_2.keys():
+				print "GENERATING IMAP HTML"
+				gen_imap_html = generate_html.gen_imap_html(res_2[key],key)
+				res2_html_dict.update({key:'imap_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'imap_'+key+'.html', gen_imap_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'imap_'+key+'.html', gen_imap_html)
+		res_2.clear()
+	except:
+		print "Exception found While Generating IMAP HTML"
+		print sys.exc_info()
+
+res3_html_dict = {}
+
+if host_ips.has_key('popserv_run'):
+	p3.join()
+	res_3 = queue3.get()
+	try:
+		if res_3.keys():
+			for key in res_3.keys():
+				print "GENERATING POP HTML"
+				gen_pop_html = generate_html.gen_pop_html(res_3[key],key)
+				res3_html_dict.update({key:'pop_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'pop_'+key+'.html', gen_pop_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'pop_'+key+'.html', gen_pop_html)
+		res_3.clear()
+	except:
+		print "Exception found While Generating IMAP HTML"
+		print sys.exc_info()
+
+res4_html_dict = {}
+
+if host_ips.has_key('mss_run'):
+	p4.join()
+	res_4 = queue4.get()
+	try:
+		if res_4.keys():
+			for key in res_4.keys():
+				print "GENERATING MSS HTML"
+				gen_mss_html = generate_html.gen_mss_html(res_4[key],key)
+				res4_html_dict.update({key:'mss_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'mss_'+key+'.html', gen_mss_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'mss_'+key+'.html', gen_mss_html)
+		res_4.clear()
+	except:
+		print "Exception found While Generating MSS HTML"
+		print sys.exc_info()
+
+res5_html_dict = {}
+
+if host_ips.has_key('mxos'):
+	p5.join()
+	res_5 = queue5.get()
+	try:
+		if res_5.keys():
+			for key in res_5.keys():
+				print "GENERATING MXOS HTML"
+				gen_mxos_html = generate_html.gen_mxos_html(res_5[key],key)
+				res5_html_dict.update({key:'mxos_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'mxos_'+key+'.html', gen_mxos_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'mxos_'+key+'.html', gen_mxos_html)
+		res_5.clear()
+	except:
+		print "Exception found While Generating MXOS HTML"
+		print sys.exc_info()
+
+res6_html_dict = {}
+
+if host_ips.has_key('app_suite'):
+	p6.join()
+	res_6 = queue6.get()
+	try:
+		if res_6.keys():
+			for key in res_6.keys():
+				print "GENERATING App SUite HTML"
+				gen_app_suite_html = generate_html.gen_app_suite_html(res_6[key],key)
+				res6_html_dict.update({key:'appsuite_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'appsuite_'+key+'.html', gen_app_suite_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'appsuite_'+key+'.html', gen_app_suite_html)
+		res_6.clear()
+	except:
+		print "Exception found While Generating App SUite HTML"
+		print sys.exc_info()
+
+res7_html_dict = {}
+
+if host_ips.has_key('cass_meta'):
+	p7.join()
+	res_7 = queue7.get()
+	try:
+		if res_7.keys():
+			for key in res_7.keys():
+				print "GENERATING Cassandra Meta HTML"
+				gen_cass_meta_html = generate_html.gen_cass_meta_html(res_7[key],key)
+				res7_html_dict.update({key:'cass_meta_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'cass_meta_'+key+'.html', gen_cass_meta_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'cass_meta_'+key+'.html', gen_cass_meta_html)
+		res_7.clear()
+	except:
+		print "Exception found While Generating cass_meta HTML"
+		print sys.exc_info()
+
+res8_html_dict = {}
+
+if host_ips.has_key('cass_blob'):
+	p8.join()
+	res_8 = queue8.get()
+	try:
+		if res_8.keys():
+			for key in res_8.keys():
+				print "GENERATING Cassandra BLOB HTML"
+				gen_cass_blob_html = generate_html.gen_cass_blob_html(res_8[key],key)
+				res8_html_dict.update({key:'cass_blob_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'cass_blob_'+key+'.html', gen_cass_blob_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'cass_blob_'+key+'.html', gen_cass_blob_html)
+		res_8.clear()
+	except:
+		print "Exception found While Generating cass_blob HTML"
+		print sys.exc_info()
+
+res9_html_dict = {}
+		
+if host_ips.has_key('mysqlDB'):
+	p9.join()
+	res_9 = queue9.get()
+	try:
+		if res_9.keys():
+			for key in res_9.keys():
+				print "GENERATING MysqlDB HTML"
+				gen_mysqldb_html = generate_html.gen_mysqldb_html(res_9[key],key)
+				res9_html_dict.update({key:'mysqldb_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'mysqldb_'+key+'.html', gen_mysqldb_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'mysqldb_'+key+'.html', gen_mysqldb_html)
+		res_9.clear()
+	except:
+		print "Exception found While Generating mysqlDB HTML"
+		print sys.exc_info()
+
+res10_html_dict = {}
+		
+if host_ips.has_key('nginx'):
+	print "Nginx Thread Wait time"
+	p10.join()
+	res_10 = queue10.get()
+	try:
+		if res_10.keys():
+			for key in res_10.keys():
+				print "GENERATING NGINX HTML"
+				gen_nginx_html = generate_html.gen_nginx_html(res_10[key],key)
+				res10_html_dict.update({key:'nginx_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'nginx_'+key+'.html', gen_nginx_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'nginx_'+key+'.html', gen_nginx_html)
+		res_10.clear()
+	except:
+		print "Exception found While Generating nginx HTML"
+		print sys.exc_info()
+
+res11_html_dict = {}
+
+if host_ips.has_key('imqueueserv_run'):
+	p11.join()
+	res_11 = queue11.get()
+	try:
+		if res_11.keys():
+			for key in res_11.keys():
+				print "GENERATING imqueueserv HTML"
+				gen_imqueueserv_html = generate_html.gen_imqueueserv_html(res_11[key],key)
+				res11_html_dict.update({key:'imqueueserv_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'imqueueserv_'+key+'.html', gen_imqueueserv_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'imqueueserv_'+key+'.html', gen_imqueueserv_html)
+		res_11.clear()
+	except:
+		print "Exception found While Generating imqueueserv HTML"
+		print sys.exc_info()
+
+res12_html_dict = {}
+
+if host_ips.has_key('imextserv_run'):
+	p12.join()
+	res_12 = queue12.get()
+	try:
+		if res_12.keys():
+			for key in res_12.keys():
+				print "GENERATING imextserv HTML"
+				gen_imextserv_html = generate_html.gen_imextserv_html(res_12[key],key)
+				res12_html_dict.update({key:'imextserv_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'imextserv_'+key+'.html', gen_imextserv_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'imextserv_'+key+'.html', gen_imextserv_html)
+		res_12.clear()
+	except:
+		print "Exception found While Generating imextserv HTML"
+		print sys.exc_info()
+
+res13_html_dict = {}
+
+if host_ips.has_key('imdirserv_run'):
+	p13.join()
+	res_13 = queue13.get()
+	try:
+		if res_13.keys():
+			for key in res_13.keys():
+				print "GENERATING imdirserv HTML"
+				gen_imdirserv_html = generate_html.gen_imdirserv_html(res_13[key],key)
+				res13_html_dict.update({key:'imdirserv_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'imdirserv_'+key+'.html', gen_imdirserv_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'imdirserv_'+key+'.html', gen_imdirserv_html)
+		res_13.clear()
+	except:
+		print "Exception found While Generating imdirserv HTML"
+		print sys.exc_info()
+
+res15_html_dict = {}
+		
+if host_ips.has_key('imconfserv_run'):
+	p15.join()
+	res_15 = queue15.get()
+	try:
+		if res_15.keys():
+			for key in res_15.keys():
+				print "GENERATING imconfserv HTML"
+				gen_imconfserv_html = generate_html.gen_imconfserv_html(res_15[key],key)
+				res15_html_dict.update({key:'imconfserv_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'imconfserv_'+key+'.html', gen_imconfserv_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'imconfserv_'+key+'.html', gen_imconfserv_html)
+		res_15.clear()
+	except:
+		print "Exception found While Generating imconfserv HTML"
+		print sys.exc_info()
+
+res16_html_dict = {}
+
+if host_ips.has_key('imdircacheserv_run'):
+	p16.join()
+	res_16 = queue16.get()
+	try:
+		if res_16.keys():
+			for key in res_16.keys():
+				print "GENERATING imdircacheserv HTML"
+				gen_imdircacheserv_html = generate_html.gen_imdircacheserv_html(res_16[key],key)
+				res16_html_dict.update({key:'imdircacheserv_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'imdircacheserv_'+key+'.html', gen_imdircacheserv_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'imdircacheserv_'+key+'.html', gen_imdircacheserv_html)
+		res_16.clear()
+	except:
+		print "Exception found While Generating imdircacheserv HTML"
+		print sys.exc_info()
+
+res17_html_dict = {}
+
+if host_ips.has_key('masterServerRole'):
+	p17.join()
+	res_17 = queue17.get()
+	try:
+		if res_17.keys():
+			for key in res_17.keys():
+				print "GENERATING imdirservsec HTML"
+				gen_imdirservsec_html = generate_html.gen_imdirservsec_html(res_17[key],key)
+				res17_html_dict.update({key:'imdirservsec_'+key+'.html'})
+				if ansible==False:
+					put_file(tomcat_hostname, tomcat_username, tomcat_path, 'imdirservsec_'+key+'.html', gen_imdirservsec_html,tomcat_password,ansible)
+				elif ansible==True:
+					put_file_ansible(tomcat_path,'imdirservsec_'+key+'.html', gen_imdirservsec_html)
+		res_17.clear()
+	except:
+		print "Exception found While Generating masterServerRole HTML"
+		print sys.exc_info()
+
+res14_html_dict = {}
+
+if host_ips.has_key('immgrserv_run'):
+	try:
+		host_ips_list = list(set(host_ips['immgrserv_run']))
+		for key in host_ips_list:
+			ip = []
+			ip.append(key)
+			queue14 = manager.Queue()
+			p14 = mp.Process(target=fetch_data.call_gen_commands, args=(ip,config_data_dict,'IMMGRSERV',queue14,ansible,mgr_mxos_ips_list,''))
+			p14.start()
+			print "Process 14 Started at ", datetime.now(), "for ", ip
+			p14.join()
+			res_14 = queue14.get()
+			print "GENERATING immgrserv HTML"
+			gen_immgrserv_html = generate_html.gen_immgrserv_html(res_14[key],key)
+			res14_html_dict.update({key:'immgrserv_'+key+'.html'})
+			if ansible==False:
+				put_file(tomcat_hostname, tomcat_username, tomcat_path, 'immgrserv_'+key+'.html', gen_immgrserv_html,tomcat_password,ansible)
+			elif ansible==True:
+				put_file_ansible(tomcat_path,'immgrserv_'+key+'.html', gen_immgrserv_html)
+			res_14.clear()
+	except:
+		print "Exception found While Generating immgrserv HTML"
+		print sys.exc_info()
+
+try :							
+	print "GENERATING Main HTML"
+	gen_main_html = generate_html.gen_main_html(res1_html_dict,res2_html_dict,res3_html_dict,res4_html_dict,res5_html_dict,res6_html_dict,res7_html_dict,res8_html_dict,res9_html_dict,res10_html_dict,res11_html_dict,res12_html_dict,res13_html_dict,res14_html_dict,res15_html_dict,res16_html_dict,res17_html_dict)
+	if ansible==False:
+		put_file(tomcat_hostname, tomcat_username, tomcat_path, 'main_ansible.html', gen_main_html,tomcat_password,ansible)
+	elif ansible==True:
+		put_file_ansible(tomcat_path,'main_ansible.html', gen_main_html)
+	print "HTML GENRATED at ---->",tomcat_path
+			
+except:
+	print "Exception found While Generating Main HTML"
+	print sys.exc_info()
+
+print "EXIT !!!!" , datetime.now()
+	
+	

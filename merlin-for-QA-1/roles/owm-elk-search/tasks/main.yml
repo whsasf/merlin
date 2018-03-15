@@ -1,0 +1,105 @@
+---
+
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-elk-search', 'owm-elk-init' ]
+
+
+- name: Check if elasticsearch is installed
+  command: rpm -q elasticsearch
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  tags: ['owm-elk-search']
+
+- name: Install elasticsearch RPM
+  shell: 'rpm -ivh {{owm_repo_url}}/elasticsearch-{{ elasticsearch_rpm_version }}.rpm'
+  when: rpm_check.rc != 0
+  tags: ['owm-elk-search']
+
+- name: Verify Target is elasticsearch_master_enabled
+  set_fact:
+    elasticsearch_master_enabled: true
+  with_items: "{{groups['elk']}}"
+  when: "inventory_hostname == item and hostvars[inventory_hostname]['master'] is defined"
+  tags: ['owm-elk-search']
+
+- name: Placing Elasticsearch configuration file
+  template:
+    src: "elasticsearch.yml.j2"
+    dest: "{{YML_File}}/elasticsearch.yml"
+    owner: "root"
+    group: "elasticsearch"
+    mode: 0750
+  when: "elasticsearch_master_enabled is defined"
+  tags: ['owm-elk-search', 'owm-elk-confupdates']
+  
+# /usr/local/share/elasticsearch/elasticsearch.in.sh  
+
+- name: Elasticsearch | create local include path
+  file:
+    path: "{{elasticsearch_local_env_include_path}}"
+    owner: "{{elasticsearch_user}}"
+    group: "{{elasticsearch_group}}"
+    mode: 0755
+    state: directory
+  tags: ['owm-elk-search']
+
+- name: Create local environment include
+  shell: "cp -vaf {{elasticsearch_source_env_include_path}}{{elasticsearch_env_include}} {{elasticsearch_local_env_include_path}}{{elasticsearch_env_include}}"
+  tags: ['owm-elk-search', 'owm-elk-confupdates']
+  
+- name: Update environment configuration  
+  lineinfile:
+    dest: "{{elasticsearch_local_env_include_path}}{{elasticsearch_env_include}}"
+    state: present
+    insertafter: '^#!/bin/sh'
+    line: "ES_HEAP_SIZE={{elasticsearch_heap_size}}"
+    backup: yes
+  tags: ['owm-elk-search', 'owm-elk-confupdates']
+  
+- name: Configuring conf file
+  lineinfile:
+    dest: '{{YML_File}}/elasticsearch.yml'
+    state: present
+    regexp: '^(.*),ENDOFLOOP(.*)$'
+    line: '\1 \2'
+    backrefs: yes
+    backup: yes
+  tags: ['owm-elk-search', 'owm-elk-confupdates']
+
+- name: Elasticsearch | create and fix data path
+  file:
+    path: "{{elasticsearch_data_path}}"
+    owner: "{{elasticsearch_user}}"
+    group: "{{elasticsearch_group}}"
+    mode: 0755
+    state: directory
+  when: elasticsearch_data_path is defined
+  tags: ['owm-elk-search']
+
+- name: Start ElasticSearch
+  service: name=elasticsearch state=started enabled=yes
+  tags: ['elkstart','owm-elk-search', 'owm-elk-confupdates']
+
+- name: Add ElasticSearch on boot up
+  shell: /sbin/chkconfig --add elasticsearch
+  tags: ['owm-elk-search']
+
+#- name: Determine elastic search server host for qadminsearch
+#  set_fact:
+#      elk_server_name: "{{ hostvars[inventory_hostname]['ansible_ssh_host'] }}"
+#  when: "inventory_hostname in groups['{{node_site}}-qadminsearch']"
+#  tags: ['owm-elk-search', 'owm-elk-init']
+
+#- pause: seconds=20
+#  tags: ['owm-elk-search']
+ 
+#- name: Create the index on elastic search server
+#  command: "curl -XPUT 'http://{{inventory_hostname}}:9200/messagerecords?pretty' -d'{\"mappings\": {\"external\": {\"date_detection\": false,\"properties\": {\"submittime\": {\"type\": \"date\",\"format\": \"yyyyMMddHHmmssSSS\"},\"attempt\": {\"type\": \"long\"},\"messageid\": {\"type\": \"string\"},\"queuename\": {\"type\": \"string\"},\"size\": {\"type\": \"long\"}},\"_ttl\":{\"enabled\": true,\"default\": \"5d\"}}}}'"
+#  when: "inventory_hostname in groups['{{node_site}}-qadminsearch']"
+#  tags: ['owm-elk-search']

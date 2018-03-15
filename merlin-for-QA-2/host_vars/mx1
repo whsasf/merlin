@@ -1,0 +1,97 @@
+ethernet_interfaces:
+ - device: eth0
+   vlan: admin
+   bootproto: static
+   address: 10.49.58.239
+   netmask: 255.255.255.0
+   gateway: 10.49.58.1
+ - device: eth0
+   vlan: service
+   bootproto: static
+   address: 10.49.58.239
+   netmask: 255.255.255.0
+ - device: eth0
+   vlan: access
+   bootproto: static
+   address: 10.49.58.239
+   netmask: 255.255.255.0
+ - device: eth0
+   vlan: storage
+   bootproto: static
+   address: 10.49.58.239
+   netmask: 255.255.255.0
+
+clusterId: cluster01
+cassandra_rack: RAC1  
+elasticsearch_data_enabled: "true"
+# The below is configured to run backup for master directory
+dirserv_backup:
+   - minute: "0"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+# The below is configured to run maintenance task
+queue_maintenance:
+   - minute: "1"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+# The below is configured to run backup for confserv directory
+confserv_backup:
+   - minute: "0"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+# The below is configured to run backup mos
+mos_backup:
+   - minute: "0"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+# The below is configured to run maintenance task
+mta_maintenance:
+   - minute: "1"
+     hour: "2"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+# The below is configured to run maintenance task
+mss_maintenance:
+   - minute: "0"
+     hour: "1"
+     day: "*"
+     month: "*"
+     weekday: "*"
+     
+# The below is configured to run maintenance
+cassmeta_maintenance:
+   - minute: "0"
+     hour: "2"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+cassblob_maintenance:
+  - minute: "0"
+    hour: "2"
+    day: "*"
+    month: "*"
+    weekday: "*"
+
+# The below is configured to run backup
+cassandra_backup:
+   - minute: "0"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"
+     

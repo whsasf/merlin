@@ -1,0 +1,123 @@
+#################################################
+# Property file to Configure the Monitoring Tool
+# File name : monitor.properties
+# Attention :Please add # at the starting of every blank line if any.
+#################################################
+#
+#
+###############################################################################
+# Properties :  MXOS_HOSTNAME & MXOS_PORT_NUMBER
+# Purpose    :  To get mxos context
+# Mandatory  :  Yes
+###############################################################################
+# If we have one mOS it will take it from the Queue Host. If we have multiple mOS it will take from mOS-nginx.
+{% if groups[node_site + '-queue'] is defined and groups[node_site +'-queue']|count() == 1 %}
+{% for host in groups[node_site + '-queue'] %}
+MXOS_HOSTNAME={{ hostvars[host]['ansible_ssh_host'] }}
+MXOS_PORT_NUMBER={{mxos_port_number}}
+{% endfor %}
+{% else %}
+{% if groups['affinity'] is defined %}
+{% for host in groups[node_site + '-affinity-mos'] %}
+{% if host in groups[node_site] and hostvars[host]['clusterId'] == node_cluster %}
+MXOS_HOSTNAME={{ host }}
+MXOS_PORT_NUMBER={{mxos_port_number}}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endif %}
+#
+#
+################################################################################
+# Properties :  CALLBACK_SERVER_IP_ADDRESS & CALLBACK_SERVER_PORT_NUMBER
+# Purpose    :  Server to get call back notifications and messages.
+# Mandatory  :  Yes
+################################################################################
+CALLBACK_SERVER_IP_ADDRESS={{ hostvars[inventory_hostname]['ansible_all_ipv4_addresses'][0] }}
+CALLBACK_SERVER_PORT_NUMBER={{callback_server_port_number}}
+#
+#
+################################################################################
+# Properties :  SERVER_LISTEN_PORT_NUMBER
+# Purpose    :  Server to get call back notifications and messages.
+# Mandatory  :  Yes
+################################################################################
+SERVER_LISTEN_PORT_NUMBER={{server_listen_port}}
+#
+#
+################################################################################
+# Properties    : MAX_RETRIES & RETRY_INTERVAL
+# Purpose       : To set Retry in mOS 
+# Mandatory     : Yes
+# Default values: MAX_RETRIES=3 and RETRY_INTERVAL=30000
+################################################################################
+MAX_RETRIES=3
+RETRY_INTERVAL=30000
+#
+#
+################################################################################
+# Properties    : ENABLE_SENT_MAILS , ENABLE_DRAFT_MAILS & ENABLE_INCOMING_MAILS
+# Purpose       : To enable/disable replications of Sent,Draft and Incoming mails 
+# Mandatory     : Yes
+# Default values: true for all
+################################################################################
+ENABLE_SENT_MAILS=true
+ENABLE_DRAFT_MAILS=true
+ENABLE_INCOMING_MAILS=true
+#
+#
+################################################################################
+# properties    : MAX_THREADS 
+# Purpose       : Maximum number of threads for process notifications.
+# Mandatory     : Yes
+# Default values: MAX_THREADS=1000
+################################################################################
+MAX_THREADS=1000
+#
+#
+################################################################################
+# Properties    : MONITOR_STORAGE_FILE_LOCATION.
+# Purpose       : to provide persistent storage to the monitoring threads.
+# Mandatory     : Yes
+################################################################################
+MONITOR_STORAGE_FILE_LOCATION={{ li_home }}/MonitoringTool-{{li_version}}-SNAPSHOT
+#
+#
+################################################################################
+# Properties    : NOTIFICATION_FILES_LOCATION.
+# Purpose       : to provide persistent storage to the incoming notification.
+# Mandatory     : Yes
+################################################################################
+NOTIFICATION_FILES_LOCATION={{li_home}}/notification_storage/
+#
+#
+################################################################################
+# Properties    : TIME_ZONES.
+# Purpose       : to provide different time zone.
+# Mandatory     : Yes
+################################################################################
+# Only GMT time zone is supported
+TIME_ZONES=GMT
+#
+#
+################################################################################
+# Properties    : JMX_REMOTE_PORT.
+# Purpose       : to access jconsole remotely.
+# Mandatory     : Yes
+################################################################################
+JMX_REMOTE_PORT={{jmx_remote_port}}
+#
+#
+################################################################################
+# Properties    : MONITOR_RUNNING_MODE.
+# Purpose       : MODE of Monitor tool- PRIMARY or SECONDARY.
+# Mandatory     : Yes
+# Default values: PRIMARY
+################################################################################
+
+{% if hostvars[inventory_hostname]['primary'] is defined %}
+MONITOR_RUNNING_MODE=PRIMARY
+{% else %}
+MONITOR_RUNNING_MODE=SECONDARY
+{% endif %}
+#

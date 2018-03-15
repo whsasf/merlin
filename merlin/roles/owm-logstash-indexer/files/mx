@@ -1,0 +1,3 @@
+MXTIMESTAMP %{YEAR}%{MONTHNUM2}%{MONTHDAY} %{USERNAME}
+MXLOGLEVEL (Note|Erro|Fatl|Warn|Urgt)
+MXLOG %{MXTIMESTAMP:timestamp} %{HOST:hostname} %{WORD:servername} %{INT:pid} %{INT:lwp} %{INT:thread} %{MXLOGLEVEL:severity};%{USERNAME:event}\(%{NUMBER:msgcat}/%{NUMBER:msgnum}\)%{GREEDYDATA:greedydata}

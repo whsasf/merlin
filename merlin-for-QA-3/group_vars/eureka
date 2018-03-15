@@ -1,0 +1,39 @@
+#
+#  password is encrypted string of "sncr" in /etc/shadow
+#
+eureka_user:
+  - username: sncr
+    password: $6$zxiaXucE$w63HLxeD9psAsW6cERr4VOdVKFKmMpcbs6jSFkkQ7yx5H8VpYURml4uM4lJ.VAOpGpTo32SO3g53oV8HI3TUx.
+    name: Eureka user account
+    home: /opt/sncr
+    groups: []
+    uid: 5502
+    ssh_key: []
+
+install_jdk_7_above: "true"
+
+# Eureka User, Support users need to be created on Directory nodes.
+#users: "{{ eureka_user + support_users }}"
+
+# Limits for 'sncr' and 'imail' user.
+limits_scopes:
+  - name: "{{eureka_user[0].username}}"
+    limits:
+     - soft memlock unlimited
+     - hard memlock unlimited
+     - soft as unlimited
+     - hard as unlimited
+     - soft nofile 524288
+     - hard nofile 524288
+     - soft nproc 65536
+     - hard nproc 65536
+     - soft core unlimited
+     - hard core unlimited
+     
+# Define variable for Eureka 
+
+# Variable for Eureka version
+# Reference: rpmpackges  owm-service-discovery-1.0.3-1.noarch.rpm
+#eureka_version: "1.0.3-1"
+#the new eureka servre called:sncr-registry :sncr-registry-2.0.5-0.noarch.rpm
+eureka_version: "2.0.5-0"

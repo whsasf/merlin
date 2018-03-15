@@ -1,0 +1,9 @@
+#!/bin/bash
+#Create timestamp variable
+timestamp=$(date '+%Y%m%d_%H%M')
+#Take mos config file backup
+tar -cf {{emailmx_user[0].home}}/mxos-{{inventory_hostname}}-$timestamp.tar.gz -C {{emailmx_user[0].home}}/mxos/config mxos.properties -C {{emailmx_user[0].home}}/mxos/config gateway-config.xml -C {{emailmx_user[0].home}}/mxos/config/hazelcast hazelcast-mxos.xml
+#Copy mos backup file into backup server
+rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{emailmx_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress {{emailmx_user[0].home}}/mxos-{{inventory_hostname}}-$timestamp.tar.gz root@{{backupserver_ip_address}}:{{backup_server_path}}
+#Delete backup file after copying into backup server
+rm -rf {{emailmx_user[0].home}}/mxos-{{inventory_hostname}}-$timestamp.tar.gz

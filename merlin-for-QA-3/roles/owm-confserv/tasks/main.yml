@@ -1,0 +1,148 @@
+---
+- name: Determine configuration server host
+  set_fact:
+      conf_server_name: "{{ hostvars[item]['inventory_hostname'] }}"
+  with_items: "{{ groups['confserv'] }}"
+  when: "hostvars[item]['primary'] is defined"
+  tags: [ 'owm-confserv','owm-confserver-init','mx','package' ]
+
+- name: Determine configuration server role
+  set_fact:
+    stand_by_conf_server_here: "1"
+  with_items: "{{ groups['confserv'] }}"
+  when: "inventory_hostname == item and hostvars[inventory_hostname]['primary'] is not defined"
+  tags: [ 'owm-confserv','owm-confserver-init','mx','package' ]
+
+- name: Check if owm-confserv is installed
+  command: rpm -q owm-confserv
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  tags: [ 'owm-confserv','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "conf_server_admin_port is {{ conf_server_admin_port}} "
+- debug:
+     msg: "conf_server_port is {{ conf_server_port}} "
+     
+     
+- name: Fresh Install owm-confserv
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} CONFSERVHOST={{conf_server_name}} PORTS_OFFSET={{PORTSOFFSET}} {% if stand_by_conf_server_here is defined %}STANDBYCONFSERVHERE=1 CONFSERV_ADMINPORT={{conf_server_admin_port}} CONFSERV_PORT={{conf_server_port}} {% endif %}CONFCACHESERVHERE={{conf_cache_server}}  DOMAINNAME={{domain_name}} rpm -ivh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-confserv-{{emailmx_version}}.el6.x86_64.rpm'
+  when: rpm_check.rc != 0
+  tags: [ 'owm-confserv' ]
+
+  
+#
+# Handle Upgrade / Downgrade
+#
+
+- name: Set Package Name
+  set_fact: 
+    package_name: "owm-confserv"
+  when: rpm_check.rc == 0
+  tags: [ 'owm-confserv','mx' ]
+
+# Check specific version
+- name: Get version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-confserv','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0
+  tags: [ 'owm-confserv','mx' ]
+
+# See which version is higher or lower
+- name: Compare installed RPM version with expected version
+  shell: '/tmp/compare_versions.sh {{emailmx_version}} {{rpm_version.stdout}}'
+  register: version_comparison
+  ignore_errors: yes
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-confserv','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "Keeping the existing {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0 and version_comparison.rc == 0
+  tags: [ 'owm-confserv','mx' ]
+
+# Try to catch the case that user specified a RPM package that is not in the {{owm_repo_url}}
+- name: Ensure {{owm_repo_url}} contains {{ package_name }}-{{emailmx_version}} RPM
+  uri: 
+    url: "{{owm_repo_url}}/{{ package_name }}-{{emailmx_version}}.el6.x86_64.rpm"
+    method: GET
+    status_code: 200
+  register: rpmpkg_file
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  check_mode: no
+
+- debug: 
+     msg: "{{ package_name }}-{{emailmx_version}}.el6.x86_64.rpm is not found in {{owm_repo_url}}"
+  when: rpm_check.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+
+- name: Abort if the {{ package_name }}-{{emailmx_version}} RPM  is missing
+  meta: end_play
+  when: rpm_check.rc == 0 and version_comparison.rc != 0 and rpmpkg_file.content_type != "application/x-rpm"
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name }} upgrade from {{rpm_version.stdout}} to {{emailmx_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1 
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name }} downgrade from {{rpm_version.stdout}} to {{emailmx_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2 
+
+- pause: seconds=3
+  when: rpm_check.rc == 0 and (version_comparison.rc == 1 or version_comparison.rc == 2 )
+ 
+- name: Stop confserv server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl stop imconfserv'
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  tags: [ 'owm-confserv','mx' ]
+
+# If application is already installed, and is a lower version do an upgrade
+- name: Upgrade {{ package_name }} from {{rpm_version.stdout}} to {{emailmx_version}}
+  # shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} CONFSERVHOST={{conf_server_name}} PORTS_OFFSET={{PORTSOFFSET}} {% if stand_by_conf_server_here is defined %}STANDBYCONFSERVHERE=1 CONFSERV_ADMINPORT={{conf_server_admin_port}} CONFSERV_PORT={{conf_server_port}} {% endif %}CONFCACHESERVHERE={{conf_cache_server}}  DOMAINNAME={{domain_name}} rpm -Uvh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-confserv-{{emailmx_version}}.el6.x86_64.rpm'
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} CONFSERVHOST={{conf_server_name}} PORTS_OFFSET={{PORTSOFFSET}} {% if stand_by_conf_server_here is defined %} CONFSERV_ADMINPORT={{conf_server_admin_port}} CONFSERV_PORT={{conf_server_port}} {% endif %}CONFCACHESERVHERE={{conf_cache_server}}  DOMAINNAME={{domain_name}} rpm -Uvh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/owm-confserv-{{emailmx_version}}.el6.x86_64.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'owm-confserv','mx' ]
+
+# If application is already installed, and is a higher version, downgrade
+# Downgrade Step #1 - remove old package
+- name: Downgrade Step 1, remove old {{ package_name }}-{{rpm_version.stdout}} package
+  shell: 'rpm -e {{ package_name }}-{{rpm_version.stdout}}'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-confserv','mx' ]
+
+# Downgrade Step #2 - install older package
+- name: Downgrade Step 2, install older {{ package_name }}-{{emailmx_version}} package
+  #shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} CONFSERVHOST={{conf_server_name}} PORTS_OFFSET={{PORTSOFFSET}} {% if stand_by_conf_server_here is defined %}STANDBYCONFSERVHERE=1 CONFSERV_ADMINPORT={{conf_server_admin_port}} CONFSERV_PORT={{conf_server_port}} {% endif %}CONFCACHESERVHERE={{conf_cache_server}}  DOMAINNAME={{domain_name}} rpm -ivh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/{{ package_name }}-{{emailmx_version}}.el6.x86_64.rpm'
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} CONFSERVHOST={{conf_server_name}} PORTS_OFFSET={{PORTSOFFSET}} {% if stand_by_conf_server_here is defined %} CONFSERV_ADMINPORT={{conf_server_admin_port}} CONFSERV_PORT={{conf_server_port}} {% endif %}CONFCACHESERVHERE={{conf_cache_server}}  DOMAINNAME={{domain_name}} rpm -ivh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/{{ package_name }}-{{emailmx_version}}.el6.x86_64.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-confserv','mx' ]
+
+# Check specific version
+- name: Get new version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'owm-confserv','mx' ]
+  check_mode: no
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (upgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'owm-confserv','mx' ]
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (downgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'owm-confserv','mx' ]  

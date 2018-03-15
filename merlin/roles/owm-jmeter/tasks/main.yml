@@ -1,0 +1,27 @@
+---
+
+- name: Create directory for JMeter package
+  file: path=/opt/merlin/jmeter state=directory
+  tags: [ 'owm-jmeter' ]
+
+- name: Install unzip package if not installed
+  yum: name=unzip state=latest
+  tags: [ 'owm-jmeter' ]
+
+- name: Get the JMeter package
+  get_url: url="{{ owm_tar_url }}/apache-jmeter-{{ jmeter_version }}.zip" dest=/opt/merlin/jmeter
+  tags: [ 'owm-jmeter' ]
+
+- name: Extract JMeter
+  unarchive: src=/opt/merlin/jmeter/apache-jmeter-{{ jmeter_version }}.zip dest=/opt/merlin/jmeter copy=no mode=755
+  tags: [ 'owm-jmeter' ]
+  when: not ansible_check_mode
+
+- name: Set one property for JMeter
+  lineinfile:
+    dest: /opt/merlin/jmeter/apache-jmeter-{{ jmeter_version }}/bin/jmeter.properties
+    state: present
+    regexp: 'jmeterengine.force.system.exit'
+    line: 'jmeterengine.force.system.exit=true'
+  tags: [ 'owm-jmeter' ]
+  when: not ansible_check_mode

@@ -1,0 +1,24 @@
+#
+#  password is encrypted string of "owm" in /etc/shadow
+#
+# EmailMx User, Eureka User , Support users need to be created on Directory nodes.
+directory_users: "{{ emailmx_user +  support_users }}"
+# Limits for 'owm' user.
+limits_scopes:
+  - name: "{{emailmx_user[0].username}}"
+    limits:
+     - soft memlock unlimited
+     - hard memlock unlimited
+     - soft nofile 524288
+     - hard nofile 524288
+     - soft nproc 65536
+     - hard nproc 65536
+     - soft core unlimited
+     - hard core unlimited
+     
+# Define variable for Eureka 
+# You can also define variables in roles/owm-eureka/vars/main.yml
+# mOS variables for mOS role
+install_jdk_7_above: "true"
+mos_version:  "2.4.13-2"
+mos_third_party_version:  "2.4.2"

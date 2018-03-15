@@ -1,0 +1,22 @@
+ethernet_interfaces:
+ - device: eth0
+   vlan: admin
+   bootproto: static
+   address: 192.168.10.100
+   netmask: 255.255.255.0
+   gateway: 192.168.10.1
+ - device: eth1
+   vlan: service
+   bootproto: static
+   address: 192.168.20.100
+   netmask: 255.255.255.0
+
+# The below is configured to run maintenance task
+mss_maintenance:
+   - minute: "0"
+     hour: "2"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+clusterId: cluster02

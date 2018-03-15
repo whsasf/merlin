@@ -1,0 +1,17 @@
+# /etc/systemd/system/service-discovery.service
+
+[Unit]
+Description=OWM Service Discovery
+After=syslog.target
+
+[Service]
+User={{eureka_user[0].username}}
+Group={{eureka_user[0].username}}
+PermissionsStartOnly=true
+ExecStartPre=/bin/mkdir -p /var/log/service-discovery/
+ExecStartPre=/bin/chown -R {{eureka_user[0].username}}:{{eureka_user[0].username}} /var/log/service-discovery/
+ExecStart={{eureka_user[0].home}}/service-discovery/service-discovery.jar
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,39 @@
+---
+- name: Install rsh
+  yum: name=rsh* state=latest
+  tags: [ 'owm-recovery','setup' ]
+
+- name: Copy .rhosts file for root
+  copy:
+     src: ".rhosts"
+     dest: "/.rhosts"
+     mode: 0644
+     owner: root 
+     group: root
+  tags: [ 'owm-recovery','setup' ]
+  
+- name: Enable rsh
+  lineinfile: dest=/etc/xinetd.d/rsh state=present regexp="disable" line="disable = no"
+  tags: [ 'owm-recover','setup' ]
+
+- name: Replace required to sufficient
+  lineinfile: dest=/etc/pam.d/rsh state=present regexp="^auth\s*required\s*pam_securetty.so" line="auth sufficient pam_securetty.so"
+  tags: [ 'owm-recover','setup' ]
+
+- name: Append rsh 
+  shell: echo 'rsh' >> /etc/securetty
+  tags: [ 'owm-recover','setup' ]
+
+- name: Restart xinetd service
+  service: name=xinetd state=restarted
+  tags: [ 'owm-recover','setup' ]
+
+- name: Copy .rhosts file user home directory
+  copy:
+     src: ".rhosts"
+     dest: "{{emailmx_user[0].home}}/.rhosts"
+     mode: 0644
+     owner: "{{emailmx_user[0].username}}"
+     group: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recovery','setup' ]
+

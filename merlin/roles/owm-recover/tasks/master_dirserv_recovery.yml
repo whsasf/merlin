@@ -1,0 +1,30 @@
+---
+- name: Create temp directory to store backup file 
+  file: path={{emailmx_user[0].home}}/imdirserv-rec state=directory mode=0755
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','dirserv','primary' ]
+
+- name: Copy the backup file data from backup server to active master primary master directory server home directory
+  shell: 'rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{emailmx_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress root@{{backupserver_ip_address}}:{{backup_server_path}}/imdirserv.*{{dirserv_backup_date}}.tar {{emailmx_user[0].home}}/imdirserv-rec'
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','dirserv','primary' ]
+
+- name: Stop primary master directory server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl stop imdirserv'
+  tags: [ 'owm-recover','dirserv','primary' ]
+
+- name: Recover primay master directory server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imdirrecover -ts {{dirserv_backup_date}} -budir {{emailmx_user[0].home}}/imdirserv-rec -server imdirserv'
+  tags: [ 'owm-recover','dirserv','primary' ]
+
+- name: Start primary master directory server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl start imdirserv'
+  tags: [ 'owm-recover','dirserv','primary' ]
+
+- name: Delete temp directory after repairing master directory server
+  file: path={{emailmx_user[0].home}}/imdirserv-rec state=absent
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-recover','dirserv','primary' ]

@@ -1,0 +1,29 @@
+---
+- name: Create directories for POP
+  file: path=/opt/merlin/jmeter/{{ item }}/pop state=directory
+  with_items:
+    - "tests"
+    - "reports"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-pop' ]
+
+- name: Put test cases for POP
+  template: src=pop/{{ item.test_case }}.j2 dest=/opt/merlin/jmeter/tests/pop/{{ item.test_case }}
+  with_items:
+    - { test_case: 'Test_POP_authorization.jmx' }
+    - { test_case: 'Test_POP_list.jmx' }
+    - { test_case: 'Test_POP_delete.jmx' }
+    - { test_case: 'Test_POP_retrieve.jmx' }
+    - { test_case: 'Test_POP_get_msg_uuid.jmx' }
+    - { test_case: 'Test_POP_top_command.jmx' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-pop' ]
+
+- name: Execute JMeter test cases for POP
+  shell: /opt/merlin/jmeter/apache-jmeter-{{jmeter_version}}/bin/jmeter -n -t /opt/merlin/jmeter/tests/pop/{{ item.test }} -l /opt/merlin/jmeter/reports/pop/{{ item.report }}
+  with_items:
+    - { test: 'Test_POP_authorization.jmx', report: 'Report_POP_authorization.jtl' }
+    - { test: 'Test_POP_list.jmx', report: 'Report_POP_list.jtl' }
+    - { test: 'Test_POP_delete.jmx', report: 'Report_POP_delete.jtl' }
+    - { test: 'Test_POP_retrieve.jmx', report: 'Report_POP_retrieve.jtl' }
+    - { test: 'Test_POP_get_msg_uuid.jmx', report: 'Report_POP_get_msg_uuid.jtl' }
+    - { test: 'Test_POP_top_command.jmx', report: 'Report_POP_top_command.jtl' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-pop' ]

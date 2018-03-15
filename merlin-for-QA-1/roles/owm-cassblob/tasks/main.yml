@@ -1,0 +1,133 @@
+---
+- name: Select the site
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: ['owm-cassblob', 'owm-cassblob-init']
+  
+- name: Set the group id
+  set_fact:
+    group_id: 'cassblob'
+  tags: ['owm-cassblob', 'owm-cassblob-init']
+
+- name: Cassandra | Make sure the cassandra dependencies are installed
+  yum: name=pkgconfig state=latest
+  tags: ['owm-cassblob']
+
+- name: Check the number of nodes
+  set_fact:
+     num_cass_meta_node: '{{ groups[node_site + "-" + group_id ] | length }}'
+  tags: ['owm-cassblob', 'owm-cassblob-init']
+
+- name: Calculate initial token value
+  shell: "python -c 'for i in range({{ num_cass_meta_node }}): print (((2**64 /{{ num_cass_meta_node }}) * i) - 2**63)'&& python -c 'for i in range({{ num_cass_meta_node }}): print (((2**64 /{{ num_cass_meta_node }}) * i) - 2**63) + 100'"
+  register: initial_token_values
+  tags: ['owm-cassblob', 'owm-cassblob-init']
+
+- name: Create initial token list
+  set_fact:
+     cassandra_initial_token: "{{ initial_token_values.stdout.split('\n') | list }}"
+  tags: ['owm-cassblob', 'owm-cassblob-init']
+
+- name: Cassandra | Download the Cassandra source release if not yet present
+  get_url:
+    url: "{{owm_tar_url}}/apache-cassandra-{{cassandra_source_version}}-bin.tar.gz"
+    dest: "/root/apache-cassandra-{{cassandra_source_version}}-bin.tar.gz"
+  tags: ['owm-cassblob']
+
+- name: Cassandra | Install jna.jar Package
+  yum: name=jna* state=latest
+  tags: ['owm-cassblob']
+
+- name: Cassandra | create of blob directory
+  file:
+    path: "{{cass_user[0].home}}/cassandra-blob"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    mode: 0755
+    state: directory
+  tags: ['owm-cassblob']
+
+- name: Cassandra | unarchive cassandra binaries
+  unarchive: src=/root/apache-cassandra-{{cassandra_source_version}}-bin.tar.gz dest={{cass_user[0].home}}/cassandra-blob copy=no
+  ignore_errors: true
+  tags: ['owm-cassblob']
+
+- name: Cassandra | Create the jna.jar  symbolic link
+  action: file state=link src=/usr/share/java/jna.jar dest={{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/lib/jna.jar
+  ignore_errors: true
+  tags: ['owm-cassblob']
+
+- include: cassandra_metrics.yml
+  when: "hostvars[groups['{{node_site}}-monitorui'][0]]['ansible_ssh_host'] is defined"
+  tags: ['owm-cassblob', 'owm-cassblob-metrics']
+
+- include: cassandra_conf_files_update.yml
+  tags: ['owm-cassblob', 'owm-cassblob-confupdates']
+
+- name: Cassandra | Change owner and groups of all Cassandra directories
+  file:
+    path: "{{cass_user[0].home}}"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    recurse: yes
+    state: directory
+  tags: ['owm-cassblob']
+
+- name: Cassandra | Change owner and groups of Cassandra data file directory
+  file:
+    path: "{{item}}"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    recurse: yes
+    state: directory
+  when: data_file_directories is defined
+  with_items: "{{data_file_directories}}"
+  tags: ['owm-cassblob']
+
+- name: Cassandra | Change owner and groups of Cassandra commit log directory
+  file:
+    path: "{{commitlog_directory}}"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    recurse: yes
+    state: directory
+  when: commitlog_directory is defined
+  tags: ['owm-cassblob']
+
+- name: Cassandra | Change owner and groups of Cassandra saved caches directory
+  file:
+    path: "{{saved_caches_directory}}"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    recurse: yes
+    state: directory
+  when: saved_caches_directory is defined
+  tags: ['owm-cassblob']
+
+- name: Create the symbolic link for cassandra home directory
+  file:
+    src: "{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}"
+    dest: "{{cass_user[0].home}}/cassandra-blob/cassandra"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    state: link
+  tags: ['owm-cassblob']
+
+- include: centos6.yml
+  when: (ansible_distribution == "CentOS" and ansible_distribution_major_version == "6") or 
+        (ansible_distribution == "RedHat" and ansible_distribution_major_version == "6")
+  tags: [ 'owm-cassblob', 'startup-script' ]
+
+- include: centos7.yml
+  when: (ansible_distribution == "CentOS" and ansible_distribution_major_version == "7") or 
+        (ansible_distribution == "RedHat" and ansible_distribution_major_version == "7")
+  tags: [ 'owm-cassblob', 'startup-script' ]
+
+- include: load_schema.yml
+  tags: ['owm-cassblob', 'owm-cassblob-loadschema']
+
+- include: cassblob_maintenance.yml
+  when: cass_maintenance
+  tags: [ 'owm-cassblob','maintenance' ]

@@ -1,0 +1,108 @@
+#!/bin/env python
+
+#
+# This Nagios plugin checks the admin port response of an Mx server.
+#
+# Copyright (c) 2015, Openwave Messaging <paul.vangool@owmessaging.com>
+# All rights reserved.
+#
+
+import os
+import optparse
+import socket
+import struct
+import sys
+
+def get_version(host=None, port=None):
+    # Create RME request 1
+    request1 = ""
+    request1 += struct.pack("B", 0x01)
+    request1 += struct.pack("B", 0x50)
+    request1 += struct.pack("B", 0x00)
+    request1 += struct.pack("B", 0x00)
+    request1 += struct.pack("B", 0x00)
+
+    # Create RME request 2
+    request2 = ""
+    request2 += struct.pack("B", 0x00)
+    request2 += struct.pack("B", 0x00)
+    request2 += struct.pack("B", 0x00)
+    request2 += struct.pack("B", 0x00)
+    request2 += struct.pack("B", 0x00)
+    request2 += struct.pack("B", 0x00)
+    request2 += struct.pack("B", 0x00)
+    request2 += struct.pack("B", 0x00)
+    request2 += struct.pack("B", 0x00)
+    request2 += struct.pack("B", 0x00)
+    request2 += struct.pack("B", 0x00)
+    request2 += struct.pack("B", 0x00)
+
+    # Create RME request 3
+    request3 = ""
+    request3 += struct.pack("B", 0x23)
+    request3 += struct.pack("B", 0x04)
+    request3 += struct.pack("B", 0x00)
+    request3 += struct.pack("B", 0x00)
+    request3 += struct.pack("B", 0x00)
+    request3 += struct.pack("B", 0x26)
+    request3 += struct.pack("B", 0x83)
+    request3 += struct.pack("B", 0x83)
+    request3 += struct.pack("B", 0x83)
+    request3 += struct.pack("B", 0x83)
+    request3 += struct.pack("B", 0x83)
+    request3 += struct.pack("B", 0x83)
+    request3 += struct.pack("B", 0x84)
+
+    try:
+        # Create TCP socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_address = (host, port)
+        sock.connect(server_address)
+
+        # Send request 1
+        sock.sendall(request1)
+
+        response = sock.recv(1024)
+
+        # Send request 2
+        sock.sendall(request2)
+
+        response = sock.recv(1024)
+
+        # Send request 3
+        sock.sendall(request3)
+
+        response = sock.recv(1024)
+        rc = struct.Struct('B').unpack(response[0])
+        op = struct.Struct('i').unpack(response[1:5])
+        strlen = struct.Struct('i').unpack(response[5:9])
+        msg = response[9:106].decode("utf-8")
+        print "OK - " + msg.split('\n')[0] + "|"
+        return 0
+
+    except socket.error as serr:
+        print "CRITICAL - " + os.strerror(serr.errno)
+        return 2
+    except:
+        print "CRITICAL - Unknown error"
+        return 2
+    finally:
+        sock.close()
+
+def main(argv):
+    p = optparse.OptionParser(conflict_handler="resolve", description="This Nagios plugin checks the admin port response of an Mx server.")
+
+    p.add_option('-H', '--host', action='store', type='string', dest='host', default='127.0.0.1', help='The hostname you want to connect to')
+    p.add_option('-P', '--port', action='store', type='int', dest='port', default=5000, help='The admin port the server is running on')
+
+    options, arguments = p.parse_args()
+    host = options.host
+    port = options.port
+
+    return get_version(host, port)
+
+#
+# main app
+#
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

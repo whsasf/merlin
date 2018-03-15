@@ -1,0 +1,57 @@
+// {{ ansible_managed }}
+
+options {
+        directory "/var/named";
+        dump-file "/var/named/data/cache_dump.db";
+
+        interface-interval 0;
+        max-cache-size unlimited;
+        max-cache-ttl 21600;
+        acache-enable yes;
+        max-acache-size 512M;
+        additional-from-cache yes;
+        stacksize unlimited;
+
+        query-source address * port *;
+
+        transfer-source *;
+
+        notify-source *;
+
+        allow-transfer {
+        {% for allow_transfer in bind_config_master_allow_transfer %}
+            {{ allow_transfer }};
+        {% endfor %}
+        };
+
+        notify yes;
+
+        also-notify {
+        };
+
+        //provide-ixfr no ;
+
+	{% if bind_config_master_forwarders %}
+        forwarders {
+        {% for forwarders in bind_config_master_forwarders %}
+            {{ forwarders }};
+        {% endfor %}
+        };
+	{% endif %}
+
+        dnssec-enable yes;
+        dnssec-validation no;
+        dnssec-lookaside auto;
+
+        auth-nxdomain no;
+  
+        listen-on port 53 { any; };
+        listen-on-v6 port 53 { any; };
+
+        zone-statistics yes;
+        statistics-file "/var/named/data/named_stats.txt";
+        memstatistics-file "/var/named/data/named_mem_stats.txt";
+
+        allow-query { any; };
+        recursion {{ bind_config_recursion }};
+};

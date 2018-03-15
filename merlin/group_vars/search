@@ -1,0 +1,4 @@
+---
+sncr_search_version: 9.6.0-1
+sncr_search_port: 8888
+cassandra_meta_native_transport_port: 9042

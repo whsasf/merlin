@@ -1,0 +1,31 @@
+---
+- name: Create directories for Cassandra
+  file: path=/opt/merlin/jmeter/{{ item }}/cassandra state=directory
+  with_items:
+    - "tests"
+    - "reports"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-cass' ]
+
+- name: Put test cases for Cassandra
+  template: src=cassandra/{{ item.test_case }}.j2 dest=/opt/merlin/jmeter/tests/cassandra/{{ item.test_case }}
+  with_items:
+    - { test_case: 'Test_Cass_process_running.jmx' }
+    - { test_case: 'Test_Cass_database_write_operation.jmx' }
+    - { test_case: 'Test_Cass_database_read_operation.jmx' }
+    - { test_case: 'Test_Cass_failover_cassblob_nodes.jmx' }
+    - { test_case: 'Test_Cass_failover_cassmeta_nodes.jmx' }
+    - { test_case: 'Test_Cass_fallback_operations_cassblob_nodes.jmx' }
+    - { test_case: 'Test_Cass_fallback_operations_cassmeta_nodes.jmx' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-cass' ]
+
+- name: Execute JMeter test cases for Cassandra
+  shell: /opt/merlin/jmeter/apache-jmeter-{{jmeter_version}}/bin/jmeter -n -t /opt/merlin/jmeter/tests/cassandra/{{ item.test }} -l /opt/merlin/jmeter/reports/cassandra/{{ item.report }}
+  with_items:
+    - { test: 'Test_Cass_process_running.jmx', report: 'Report_Cass_process_running.jtl' }
+    - { test: 'Test_Cass_database_write_operation.jmx', report: 'Report_Cass_database_write_operation.jtl' }
+    - { test: 'Test_Cass_database_read_operation.jmx', report: 'Report_Cass_database_read_operation.jtl' }
+    - { test: 'Test_Cass_failover_cassblob_nodes.jmx', report: 'Report_Cass_failover_cassblob_nodes.jtl' }
+    - { test: 'Test_Cass_failover_cassmeta_nodes.jmx', report: 'Report_Cass_failover_cassmeta_nodes.jtl' }
+    - { test: 'Test_Cass_fallback_operations_cassblob_nodes.jmx', report: 'Report_Cass_fallback_operations_cassblob_nodes.jtl' }
+    - { test: 'Test_Cass_fallback_operations_cassmeta_nodes.jmx', report: 'Report_Cass_fallback_operations_cassmeta_nodes.jtl' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-cass' ]

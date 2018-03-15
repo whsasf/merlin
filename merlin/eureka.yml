@@ -1,0 +1,7 @@
+---
+- hosts: eureka
+  serial: 1
+  roles:
+    - common
+    - jdk
+    - owm-eureka

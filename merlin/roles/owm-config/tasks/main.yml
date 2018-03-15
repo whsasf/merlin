@@ -1,0 +1,16 @@
+---
+- name: Determine configuration server host
+  set_fact:
+      conf_server_name: "{{ hostvars[item]['inventory_hostname'] }}"
+  with_items: "{{ groups['directory'] }}"
+  when: "hostvars[item]['primary'] is defined"
+  tags: [ 'configuration', 'owm-config' ]
+
+- name: Copy the config.db template file
+  template:
+    src: "config.db.j2"
+    dest: "{{emailmx_user[0].home}}/config/config.db.merlin"
+    owner: "{{emailmx_user[0].username}}"
+    group: "{{emailmx_user[0].username}}"
+    mode: 0440
+  tags: [ 'configuration', 'owm-config' ]

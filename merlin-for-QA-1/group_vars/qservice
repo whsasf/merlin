@@ -1,0 +1,15 @@
+#Note: Change "QUORUM" to "ONE" if the backend has less than two nodes
+queue_service_version: 1.0.0.9-7 
+queue_service_port: 8013
+queue_service_cassmeta_read_consistency: QUORUM
+queue_service_cassmeta_write_consistency: QUORUM
+queue_service_cassblob_read_consistency: QUORUM
+queue_service_cassblob_write_consistency: QUORUM
+queue_service_esendpoint_port: "9300"
+queue_service_cassmeta_endpoint_port: "9042"
+queue_service_cassblob_endpoint_port: "9043"
+
+install_jdk_7_above: "true"
+
+#qservice_users: "{{ emailmx_user + cass_user + support_users }}"
+#qservice_users: "{{ emailmx_user + support_users }}"

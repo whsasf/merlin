@@ -1,0 +1,12 @@
+---
+# This is example of activation code.
+# NOTE: the activation code will active Nessus for only 15 days. The same activation code can not be used again once Nessus is 
+# activated.
+nessus_activation_code: EF63-9FA5-7278-A5F3-36F9
+
+# Nessus package information
+nessus_install_path: /opt/nessus
+
+# Nessus package information
+nessus_package_version: 6.10.8
+nessus_package_architecture: es6.x86_64

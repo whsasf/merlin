@@ -1,0 +1,23 @@
+---
+- name: Install the required packages
+  yum: name={{ item }} state=present
+  with_items:
+    - haproxy
+    - socat
+  tags: [ 'package', 'haproxy' ]
+
+- name: Enable haproxy service
+  service: name=haproxy enabled=yes
+  tags: [ 'service', 'haproxy' ]
+  when: not ansible_check_mode
+
+- name: Ensure chroot directory exists
+  file: name={{ haproxy_global.chroot }} state=directory
+  when: haproxy_global.chroot is defined and haproxy_global.chroot
+  tags: [ 'configuration', 'haproxy' ]
+
+- name: Copy the config template file
+  template: src={{ haproxy_config_template }} dest={{ haproxy_config_location }}
+  notify: restart haproxy
+  tags: [ 'configuration', 'haproxy' ]
+

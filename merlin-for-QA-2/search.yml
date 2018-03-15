@@ -1,0 +1,10 @@
+---
+- hosts: search
+  vars:
+      initiate: 2
+  serial: 1
+  roles:
+    - common
+    - jdk
+#    - owm-common
+    - sncr-search

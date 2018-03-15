@@ -1,0 +1,11 @@
+---
+- hosts: dircacheserv
+  vars:
+      initiate: 3
+  serial: 1
+  roles:
+    - common
+    - jdk
+    - owm-common
+    - owm-sur-common
+    - owm-dircacheserv

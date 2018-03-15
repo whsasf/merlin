@@ -1,0 +1,7 @@
+---
+# To test the memroy. It can be given as B,K,M, and G to indicate bytes, 
+# kilobytes, megabytes, or gigabytes respectively.
+memtory_size: 2G
+# Number of loops to iterate through.
+number_of_iterations: 1
+report_file: report.txt

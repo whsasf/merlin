@@ -1,0 +1,60 @@
+ethernet_interfaces:
+ - device: eth0
+   vlan: admin
+   bootproto: static
+   address: 54.219.72.46
+   netmask: 255.255.252.0
+   gateway: 172.26.200.1
+ - device: eth0
+   vlan: service
+   bootproto: static
+   address: 54.219.72.46
+   netmask: 255.255.252.0
+ - device: eth0
+   vlan: access
+   bootproto: static
+   address: 54.219.72.46
+   netmask: 255.255.252.0
+clusterId: cluster01
+
+# The below is configured to run backup for master directory
+dirserv_backup:
+   - minute: "0"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+# The below is configured to run backup for confserv directory
+confserv_backup:
+   - minute: "0"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+# The below is configured to run backup mos
+mos_backup:
+   - minute: "0"
+     hour: "0"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+# The below is configured to run maintenance task
+mta_maintenance:
+   - minute: "1"
+     hour: "2"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+# The below is configured to run maintenance task
+mss_maintenance:
+   - minute: "0"
+     hour: "1"
+     day: "*"
+     month: "*"
+     weekday: "*"
+
+

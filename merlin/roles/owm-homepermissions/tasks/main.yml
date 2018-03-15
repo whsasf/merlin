@@ -1,0 +1,12 @@
+---
+- name: Fix permissions on users
+  command: find {{ item.home }} -type d -exec chown {{ item.username }}:{{ item.username if users_create_per_user_group else users_group }} {} \;
+  with_items: "{{ users }}"
+  ignore_errors: yes
+  tags: [ 'userpermissions' ]
+  
+- name: Fix access on required paths
+  command: find {{ item }} -type d -exec chmod 0755 {} \;
+  when: required_paths is defined
+  with_items: "{{ required_paths|default([]) }}"
+  tags: [ 'userpermissions' ]

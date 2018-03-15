@@ -1,0 +1,85 @@
+worker_processes auto;
+
+daemon on;
+master_process on;
+
+error_log  {{ nginx_home_dir }}/nginx_mss/nginx{{ owm_nginx_version }}/logs/error.log error;
+
+pid        /run/nginx/nginx-mss.pid;
+
+worker_rlimit_nofile 200000;
+worker_rlimit_core  500M;
+working_directory   {{ nginx_home_dir }}/nginx_mss/nginx{{ owm_nginx_version }};
+
+events {
+    worker_connections 25000;
+    use epoll;
+    multi_accept off;
+}
+
+http {
+    sendfile on;
+    keepalive_requests 500000;
+    keepalive_timeout 60s;
+    tcp_nopush on;
+    tcp_nodelay on;
+    client_body_buffer_size 128k;
+
+    open_file_cache max=25000 inactive=30s;
+    open_file_cache_valid    60s;
+    open_file_cache_min_uses 2;
+    open_file_cache_errors   on;
+
+    log_format timed_combined '$remote_addr - $remote_user [$time_local]  '
+
+    '"$request" $status $body_bytes_sent '
+    '"$http_referer" "$upstream_addr" '
+    '$request_time $upstream_response_time request_time $pipe';
+
+    access_log logs/access.log timed_combined;
+	
+    upstream mss_{{node_site}} {
+{% if groups['mss'] is defined %}
+{% for host in groups['mss'] %}
+{% if host in groups[node_site] and hostvars[host]['clusterId'] == node_cluster %}
+        server {{ host }}:{{mss_listening_port}};
+{% endif %}
+{% endfor %}
+{% endif %}
+
+        hash $http_host;
+        hash_again 100;
+        healthcheck_enabled;
+        healthcheck_delay 2000;
+        healthcheck_timeout 2000;
+        healthcheck_failcount 2;
+        healthcheck_send 'GET /ping HTTP/1.0';
+        keepalive 100;
+		
+    }
+
+    server {
+        listen {{mss_listening_port_proxy}};
+        server_name *.{{node_site}};
+        keepalive_timeout 60s;
+        client_max_body_size 0;
+
+        location /mx_mss_status {
+           healthcheck_status;
+        }
+
+
+        location / {
+           proxy_http_version 1.1;
+           proxy_set_header Connection "";
+           proxy_pass http://mss_{{node_site}};
+        }
+
+        keepalive_requests 500000;
+        proxy_connect_timeout 15s;
+        proxy_read_timeout  60s;
+        proxy_send_timeout 15s;
+        proxy_next_upstream off;
+        proxy_buffering off;
+    }
+}

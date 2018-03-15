@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+
+define hostgroup {
+  hostgroup_name mssservers 
+  alias Message Store Servers
+}
+{% if groups['mss'] is defined %}
+{% for host in groups['mss'] %}
+
+define host {
+  use                     linux-server
+  host_name               {{ host }}
+  alias                   {{ host }}
+  address                 {{ hostvars[host].ansible_ssh_host }}
+  hostgroups              mssservers 
+}
+{% endfor %}
+
+define service {
+  use                     local-service
+  hostgroup_name          mssservers
+  service_description     Mx immgrserv version
+  check_command           get_mx_version!5003!!!!!!!
+}
+
+define service {
+  use                     local-service
+  hostgroup_name          mssservers
+  service_description     Mx mss version
+  check_command           get_mx_version!5010!!!!!!!
+}
+{% endif %}

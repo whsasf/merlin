@@ -1,0 +1,9 @@
+---
+logstash_main_version: 1.5
+logstash_sub_version: 4
+# Paths used for shipper configuration file.
+appsuite_log_path: /var/log
+mysqld_log_path: /var/log
+nagios_log_path: /var/log
+python_script_path: /var/log
+scality_log_path: /var/log

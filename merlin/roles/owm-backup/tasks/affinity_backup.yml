@@ -1,0 +1,81 @@
+---
+- name: Take mss and mos configuration file backup
+  command: 'tar -cf {{nginx_home_dir}}/affinity-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz -C {{nginx_home_dir}}/nginx_{{ item }}/nginx{{ owm_nginx_version }}/conf nginx.conf'
+  when: "inventory_hostname in groups['{{ node_site }}-affinity-{{ item }}']" 
+  with_items:
+     - "mss"
+     - "mos"
+  sudo: yes
+  sudo_user: "root"
+  tags: [ 'owm-backup','affinity','affinity-backup' ]
+
+- name: Take failover configuration file backup
+  command: 'tar -cf {{nginx_home_dir}}/affinity-{{inventory_hostname}}-{{ item }}-{{timestamp.stdout}}.tar.gz -C {{nginx_home_dir}}/nginx_{{ item }}/nginx{{ owm_nginx_version }}/conf nginx.conf'
+  when: "inventory_hostname in groups['{{ node_site }}-affinity-failover']"
+  with_items:
+     - "mss"
+     - "mos"
+  sudo: yes
+  sudo_user: "root"
+  tags: [ 'owm-backup','affinity','affinity-backup' ]
+
+- name: Copy mss and mos affinity manager server backup file into backup server
+  shell: 'rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{nginx_home_dir}}/backup_transfer_keys/backup_transfer.rsa" --progress {{nginx_home_dir}}/affinity-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz root@{{backupserver_ip_address}}:{{backup_server_path}}'
+  when: "inventory_hostname in groups['{{ node_site }}-affinity-{{ item }}']"
+  with_items:
+     - "mss"
+     - "mos"
+  tags: [ 'owm-backup','affinity','affinity-backup' ]
+
+- name: Copy failover affinity manager server backup files into backup server
+  shell: 'rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{nginx_home_dir}}/backup_transfer_keys/backup_transfer.rsa" --progress {{nginx_home_dir}}/affinity-{{inventory_hostname}}-* root@{{backupserver_ip_address}}:{{backup_server_path}}'
+  when: "inventory_hostname in groups['{{ node_site }}-affinity-failover']"
+  tags: [ 'owm-backup','affinity','affinity-backup' ]
+
+- name : Delete mss and mos backup file after copying on backup server 
+  file: path={{nginx_home_dir}}/affinity-{{inventory_hostname}}-{{timestamp.stdout}}.tar.gz state=absent
+  when: inventory_hostname not in groups['{{ node_site }}-affinity-{{ item }}']
+  with_items:
+     - "mss"
+     - "mos"
+  sudo: yes
+  sudo_user: "root"
+  tags: [ 'owm-backup','affinity','affinity-backup' ]
+
+- name: Delete failover backup file after copying on backup server
+  shell: rm -rf {{nginx_home_dir}}/affinity-{{inventory_hostname}}-*
+  when: "inventory_hostname in groups['{{ node_site }}-affinity-failover']"
+  sudo: yes
+  sudo_user: "root"
+  tags: [ 'owm-backup','affinity','affinity-backup' ]
+
+- name: Create directory to store script files
+  file: path={{nginx_home_dir}}/scripts state=directory mode=0755
+  sudo: yes
+  sudo_user: "root"
+  tags: [ 'owm-backup','affinity','affinity-cronjob' ]
+
+- name: backup script for affinity {{ item }}
+  template:
+    src: "affinity_{{ item }}_backup.sh.j2"
+    dest: "{{nginx_home_dir}}/scripts/affinity_{{ item }}_backup.sh"
+    owner: "root"
+    group: "root"
+    mode: 0644
+  when: "inventory_hostname in groups['{{ node_site }}-affinity-{{ item }}']"
+  with_items:
+     - "mss"
+     - "mos"
+     - "failover"
+  sudo: yes
+  sudo_user: "root"
+  tags: ['owm-backup','affinity','affinity-cronjob']
+
+- name: Create cron job for affinity {{ item }} backup
+  cron: name="Cron Job for affinity {{ item }} backup" user="root" minute="{{affinity_backup[0].minute}}" hour="{{affinity_backup[0].hour}}" day="{{affinity_backup[0].day}}" month="{{affinity_backup[0].month}}" weekday="{{affinity_backup[0].weekday}}" job="bash {{nginx_home_dir}}/scripts/affinity_{{ item }}_backup.sh 2> /dev/null 2>&1"
+  when: "inventory_hostname in groups['{{ node_site }}-affinity-{{ item }}']"
+  with_items:
+    - "mss"
+    - "mos"
+    - "failover"
+  tags: ['owm-backup','affinity','affinity-cronjob']

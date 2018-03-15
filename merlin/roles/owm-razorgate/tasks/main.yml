@@ -1,0 +1,7 @@
+- include: couchbase_razorgate.yml
+  when:   "razorgate_type == 'couchbase'"
+  tags: ['owm-razorgate']
+
+- include: configdb_razorgate.yml
+  when:   "razorgate_type == 'configdb'"
+  tags: ['owm-razorgate']

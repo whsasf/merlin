@@ -1,0 +1,120 @@
+// Keyspace for Search service
+ 
+CREATE KEYSPACE IF NOT EXISTS search 
+  WITH REPLICATION = {
+     'class' : 'NetworkTopologyStrategy', 
+{% set comma = joiner(",") %}
+{% for site in sites -%}
+      {{ comma() }}'{{site}}' : '{{metareplicationfactor}}' 
+{%- endfor %}
+    }
+  AND DURABLE_WRITES = true;
+ 
+
+//Just for UT purpose  For Singlenode Cassandra
+//CREATE KEYSPACE search WITH replication = {
+// 'class': 'SimpleStrategy',
+//  'replication_factor': '1'
+//};
+
+
+
+// Use keyspace
+
+USE search;
+
+// Configuration table. This table possibly moves to a
+// configuration keyspace if we plan to have a one-stop-shop for cass stubs.
+// Used for tracking schema versions, updates, etc.
+
+ 
+
+CREATE TABLE IF NOT EXISTS OWM_Config
+(
+    service     text,    // Short name of this service. Part of primary key.
+    component   text,    // sub category, component, folder. Part of PK.
+    server      text,    // Server. May be wildcard or blank. Part of PK.
+    key         text,    // Clustering key.
+    value       text,    // Configuration value.
+    PRIMARY KEY ((service, component, server), key)
+) WITH CLUSTERING ORDER BY (key ASC );
+
+ 
+
+INSERT INTO OWM_Config (service, component, server, key, value)
+           VALUES ('SEARCH', 'Schema', '', 'Version', '1.0.0');
+
+ 
+CREATE TABLE IF NOT EXISTS heartbeats (
+    instance text,          // Instance
+    heartbeat timestamp,    // Heart beat time stamp
+    PRIMARY KEY (instance)
+) WITH COMPACTION = { 'class' : 'LeveledCompactionStrategy' };
+
+
+
+// Field syntax table recording the syntax of the different fields indexed.
+// Table is dynamically populated on indexation, adding fields never encountered before,
+// allowing to dynamically support new fields.
+// Typically such table is written only once, and its content is cached in memory
+// by server table
+
+CREATE TABLE IF NOT EXISTS fieldSyntax (
+    docType text,  // Type of document
+    field int,     // Field id
+    syntax text,   // Field syntax, such as string, integer, boolean, date, header, email
+    PRIMARY KEY (docType, field)
+) WITH COMPACTION = { 'class' : 'LeveledCompactionStrategy' };
+
+
+
+// Bucket table, serving multiple purposes
+// - holding the list of existing buckets
+// - holding the time range the bucket covers (useful to search most recent document first, or document that match a time range...)
+// - holding the size of the buckets, useful when adding a document to know what bucket to assign
+
+CREATE TABLE IF NOT EXISTS buckets (
+    docType text,               // Type of document
+    userId varchar,             // User unique id (likely the mailbox id)
+    bucket int,                 // Bucket number
+    date bigint,                // Bucket date. Can be a start date when bucket is filled in ascending document order
+                                // (from oldest to newest) or an end date when bucket is filled in descending document
+                                //  order (from newest to oldest).
+                                // Mind such date is not be 100% accurate, and might require to peek in previous or
+                                // next bucket if real accuracy is required. Start date is inclusive, end date is exclusive
+    size int,                   // Current bucket size, e.g. sum of fragments size in the bucket. Mind also
+                                // it might not be 100% accurate.
+    tag timeuuid,               // Bucket tag unique id
+    ascending boolean,          // Indicates whether the bucket is filled in ascending or descending order, so
+                                // whether the date is start date or end date
+    state int,                  // Bucket state: 0(active) 1(under maintenance) 2(under creation) 3(under cleanup)
+    owner varchar static,       // Maintenance owning instance
+    maintDate timestamp static, // Last maintenance date
+    
+    PRIMARY KEY ((docType, userId), bucket)
+) WITH CLUSTERING ORDER BY (bucket DESC)
+    AND COMPACTION = { 'class' : 'LeveledCompactionStrategy' };
+
+
+// Index Fragment table.
+// Fragments are partitioned by buckets, with bucket size kept under control via the buckets table
+// As bucket date might not be 100% accurate, the docDate is useful for service to verify the documents
+// actually match the time range, when specified.
+
+CREATE TABLE IF NOT EXISTS IndexFragments (
+    docType text,           // Type of document
+    userId varchar,         // User unique id (likely the mailbox id)
+    bucket int,             // Bucket
+    folderId varchar,       // Folder identifier
+    docId varchar,          // Document primary id
+    secondaryId varchar,    // Document secondary id
+    docDate bigint,         // Document date
+    size int,               // Fragment size (terms + positions), useful for mailbox maintenance, to avoid retrieving the blobs
+    version int,            // Version of indexed data - usefull to trigger re-indexation when analysis is modified
+    termsif blob,           // Terms index fragment
+    positionsif blob,       // Positions index fragment
+    PRIMARY KEY ((docType, userId, bucket), folderId, docId)
+) WITH CLUSTERING ORDER BY (folderId DESC, docId DESC)
+    AND COMPACTION = { 'class' : 'LeveledCompactionStrategy' };
+
+

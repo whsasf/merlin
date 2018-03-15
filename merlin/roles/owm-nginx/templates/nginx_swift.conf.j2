@@ -1,0 +1,43 @@
+worker_processes auto;
+
+daemon on;
+master_process on;
+
+
+error_log  logs/error.log error;
+
+pid        /run/nginx/nginx-swift.pid;
+
+worker_rlimit_nofile 200000;
+worker_rlimit_core  500M;
+working_directory   {{ nginx_home_dir }}/nginx_{{component}}/nginx{{ owm_nginx_version }};
+
+events {
+    worker_connections 25000;
+    use epoll;
+    multi_accept off;
+}
+http {
+    
+   upstream s3 {
+{% if groups['swift-hugemail'] is defined %}
+{% for host in groups['swift-hugemail'] %}
+{% if host in groups[node_site] %}
+        server {{ host }}:{{swift_listening_port}};
+{% endif %}
+{% endfor %}
+{% endif %}
+   }
+
+   server {
+      listen {{swift_listening_port_proxy}};
+      client_max_body_size 2048m;
+      location / {
+          proxy_pass http://s3;
+          proxy_set_header Connection "";
+      }
+   }
+}
+
+
+

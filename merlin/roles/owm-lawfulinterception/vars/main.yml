@@ -1,0 +1,14 @@
+---
+li_home: /opt/merlin/lawfulinterception
+li_version: 1.0.0
+mxos_port_number: 8081
+callback_server_port_number: 1234
+server_listen_port: 1234
+jmx_remote_port: 8855
+# Set time to sync the monitor file. Currently it is for every minute
+sync_monitor:
+   - minute: "*/1"
+     hour: "*"
+     day: "*"
+     month: "*"
+     weekday: "*"

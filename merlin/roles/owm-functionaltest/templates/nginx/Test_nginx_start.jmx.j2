@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="2.8" jmeter="2.13 r1665067">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="NGINX Process Start" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments">
+{% if groups['affinity'] is defined %}
+{% for host in groups[node_site + '-affinity'] %}
+          <elementProp name="g_Hostname" elementType="Argument">
+            <stringProp name="Argument.name">g_Hostname_{{ hostvars[host]['component'] }}</stringProp>
+            <stringProp name="Argument.value">{{ host }}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+{% if hostvars[host]['component'] != 'failover' %}
+	  <elementProp name="g_NginxPath" elementType="Argument">
+            <stringProp name="Argument.name">g_NginxPath_{{ hostvars[host]['component'] }}</stringProp>
+            <stringProp name="Argument.value">{{ nginx_home_dir }}/nginx_{{ hostvars[host]['component'] }}/nginx{{ owm_nginx_version }}/scripts/nginx</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>	
+{% endif %}
+{% endfor %}
+{% endif %}
+        </collectionProp>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1441890505000</longProp>
+        <longProp name="ThreadGroup.end_time">1441890505000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+{% if groups['affinity'] is defined %}
+{% for host in groups[node_site + '-affinity'] %}
+        <BeanShellSampler guiclass="BeanShellSamplerGui" testclass="BeanShellSampler" testname="Nginx Start" enabled="true">
+          <stringProp name="BeanShellSampler.query">import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+import java.io.InputStream;
+import java.util.Properties;
+
+Channel channel = null;
+Session session = null;
+StringBuilder rv = new StringBuilder();
+
+try {
+  JSch jsch = new JSch();
+  jsch.addIdentity(&quot;{{current_user_home_dir}}&quot;+&quot;/.ssh/id_rsa&quot;);
+  session = jsch.getSession(&quot;root&quot;, &quot;${g_Hostname_{{ hostvars[host]['component'] }}}&quot;);
+  Properties config = new Properties();
+  config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+  session.setConfig(config);
+  session.connect();
+  channel = session.openChannel(&quot;exec&quot;);            
+{% if hostvars[host]['component'] != 'failover' %}  
+  ((ChannelExec) channel).setCommand(&quot;${g_NginxPath_{{ hostvars[host]['component'] }}} start&quot;);
+{% endif %}
+{% if hostvars[host]['component'] == 'failover' %}  
+  ((ChannelExec) channel).setCommand(&quot;${g_NginxPath_mss} start&quot;);
+  ((ChannelExec) channel).setCommand(&quot;${g_NginxPath_mos} start&quot;);
+{% endif %}
+  channel.setInputStream(null);
+  ((ChannelExec) channel).setErrStream(System.err);
+  InputStream in = channel.getInputStream();
+  channel.connect();
+  byte[] tmp = new byte[1024];
+  rv.append(&quot;New system date: &quot;);
+  while (true) {
+  	while (in.available() &gt; 0) {
+  		int i = in.read(tmp, 0, 1024);
+  		if (i &lt; 0) break;
+  		rv.append(new String(tmp, 0, i));
+  	}
+  	if (channel.isClosed()) {
+  		break;
+  	}
+  	try {
+  		Thread.sleep(100);
+  	} catch (Exception ee) {
+  		ee.printStackTrace();
+  	}
+  }
+  byte[] tmp = new byte[1024];
+} catch (Exception ex) {
+        ex.printStackTrace();
+	rv.append(ex.getMessage());
+}
+channel.disconnect();
+session.disconnect();
+print(rv.toString());
+return rv.toString();</stringProp>
+          <stringProp name="BeanShellSampler.filename"></stringProp>
+          <stringProp name="BeanShellSampler.parameters"></stringProp>
+          <boolProp name="BeanShellSampler.resetInterpreter">false</boolProp>
+        </BeanShellSampler>
+        <hashTree>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Response Assertion" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="1696813254">Starting nginx: [  OK  ]</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">2</intProp>
+            <stringProp name="Assertion.scope">children</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+          </hashTree>
+{% endfor %}
+{% endif %}
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>false</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>false</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <threadCounts>true</threadCounts>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

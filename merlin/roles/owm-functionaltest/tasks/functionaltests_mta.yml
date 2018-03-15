@@ -1,0 +1,39 @@
+---
+- name: Create directories for MTA
+  file: path=/opt/merlin/jmeter/{{ item }}/mta state=directory
+  with_items:
+    - "tests"
+    - "reports"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mta' ]
+
+- name: Put test cases for Directory
+  template: src=mta/{{ item.test_case }}.j2 dest=/opt/merlin/jmeter/tests/mta/{{ item.test_case }}
+  with_items:
+    - { test_case: 'Test_MTA_sending_msg.jmx' }
+    - { test_case: 'Test_MTA_sending_large_msg.jmx' }
+    - { test_case: 'Test_MTA_sending_multiple_msg.jmx' }
+    - { test_case: 'Test_MTA_total_mail_quota.jmx' }
+    - { test_case: 'Test_MTA_max_mail_quota_for_a_message.jmx' }
+    - { test_case: 'Test_MTA_max_quota_messages.jmx' }
+    - { test_case: 'Test_MTA_shared_messages_deposition.jmx' }
+    - { test_case: 'Test_MTA_shared_messages_retrieval_even_after_delete.jmx' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mta' ]
+
+- name: Put other files required by test casses
+  copy: src=mta/{{ item.file }} dest=/opt/merlin/jmeter/tests/mta/{{ item.file }}
+  with_items:
+    - { file: '10MB.txt' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mta' ]
+
+- name: Execute JMeter test cases for MTA
+  shell: /opt/merlin/jmeter/apache-jmeter-{{jmeter_version}}/bin/jmeter -n -t /opt/merlin/jmeter/tests/mta/{{ item.test }} -l /opt/merlin/jmeter/reports/mta/{{ item.report }}
+  with_items:
+    - { test: 'Test_MTA_sending_msg.jmx', report: 'Report_MTA_sending_msg.jtl' }
+    - { test: 'Test_MTA_sending_large_msg.jmx', report: 'Report_MTA_sending_large_msg.jtl' }
+    - { test: 'Test_MTA_sending_multiple_msg.jmx', report: 'Report_MTA_sending_multiple_msg.jtl' }
+    - { test: 'Test_MTA_total_mail_quota.jmx', report: 'Report_MTA_total_mail_quota.jtl' }
+    - { test: 'Test_MTA_max_mail_quota_for_a_message.jmx', report: 'Report_MTA_max_mail_quota_for_a_message.jtl'}
+    - { test: 'Test_MTA_max_quota_messages.jmx', report: 'Report_MTA_max_quota_messages.jtl' }
+    - { test: 'Test_MTA_shared_messages_deposition.jmx', report: 'Report_MTA_shared_messages_deposition.jtl' }
+    - { test: 'Test_MTA_shared_messages_retrieval_even_after_delete.jmx', report: 'Report_MTA_shared_messages_retrieval_even_after_delete.jtl' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-mta' ]

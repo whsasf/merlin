@@ -1,0 +1,23 @@
+---
+- name: Create directories for Queue
+  file: path=/opt/merlin/jmeter/{{ item }}/queue state=directory
+  with_items:
+    - "tests"
+    - "reports"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-queue' ]
+
+- name: Put test cases for Queue
+  template: src=queue/{{ item.test_case }}.j2 dest=/opt/merlin/jmeter/tests/queue/{{ item.test_case }}
+  with_items:
+   - { test_case: 'Test_QUEUE_check_deferral_mail.jmx' }
+   - { test_case: 'Test_QUEUE_mss_affinity_down.jmx' }
+   - { test_case: 'Test_QUEUE_mailbox_maintenance_mode.jmx' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-queue' ]
+
+- name: Execute JMeter test cases for Queue
+  shell: /opt/merlin/jmeter/apache-jmeter-{{jmeter_version}}/bin/jmeter -n -t /opt/merlin/jmeter/tests/queue/{{ item.test }} -l /opt/merlin/jmeter/reports/queue/{{ item.report }}
+  with_items:
+   - { test: 'Test_QUEUE_check_deferral_mail.jmx', report: 'Report_QUEUE_check_deferral_mail.jtl' }
+   - { test: 'Test_QUEUE_mss_affinity_down.jmx', report: 'Report_QUEUE_mss_affinity_down.jtl' }
+   - { test: 'Test_QUEUE_mailbox_maintenance_mode.jmx', report: 'Report_QUEUE_mailbox_maintenance_mode.jtl' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-queue' ]

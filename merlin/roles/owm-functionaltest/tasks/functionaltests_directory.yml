@@ -1,0 +1,57 @@
+---
+- name: Create directories for Directory
+  file: path=/opt/merlin/jmeter/{{ item }}/ldap state=directory
+  with_items:
+    - "tests"
+    - "reports"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-ldap' ]
+
+- name: Put test cases for Directory
+  template: src=ldap/{{ item.test_case }}.j2 dest=/opt/merlin/jmeter/tests/ldap/{{ item.test_case }}
+  with_items:
+    - { test_case: 'Test_add_ldap_user.jmx' }
+    - { test_case: 'Test_modify_ldap_user.jmx' }
+    - { test_case: 'Test_ldap_search_user.jmx' }
+    - { test_case: 'Test_delete_ldap_user.jmx' }
+    - { test_case: 'Test_modrdn_ldap_user.jmx' }
+    - { test_case: 'Test_add_ldap_user_CSV.jmx' }
+    - { test_case: 'Test_user_replication.jmx' }
+    - { test_case: 'Test_dirserv_dircache_sync.jmx' }
+    - { test_case: 'Test_search_multiple_user.jmx' }
+    - { test_case: 'Test_search_user_dircache.jmx' }
+    - { test_case: 'Test_write_through_dircache.jmx' }
+    - { test_case: 'Test_primary_and_secondary_server_sync.jmx' }
+    - { test_case: 'Test_failover_directory_server.jmx' }
+    - { test_case: 'Test_fallback_primary_directory_server.jmx' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-ldap' ]
+
+- name: Put other files required by test casses
+  copy: src=ldap/{{ item.file }} dest=/opt/merlin/jmeter/tests/ldap/{{ item.file }}
+  with_items:
+    - { file: 'ldap_user_add.txt' }
+    - { file: 'ldap_dircahce_sync.txt' }
+    - { file: 'ldap_Fallback_user_add.txt' }
+    - { file: 'ldap_test.txt' }
+    - { file: 'ldap_user_search.txt' }
+    - { file: 'ldap_user_Write_through.txt' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-ldap' ]
+
+- name: Execute JMeter test cases for Directory
+  shell: /opt/merlin/jmeter/apache-jmeter-{{jmeter_version}}/bin/jmeter -n -t /opt/merlin/jmeter/tests/ldap/{{ item.test }} -l /opt/merlin/jmeter/reports/ldap/{{ item.report }}
+  with_items:
+    - { test: 'Test_add_ldap_user.jmx', report: 'Report_add_ldap_user.jtl' }
+    - { test: 'Test_modify_ldap_user.jmx', report: 'Report_modify_ldap_user.jtl' }
+    - { test: 'Test_ldap_search_user.jmx', report: 'Report_ldap_search_user.jtl' }
+    - { test: 'Test_modrdn_ldap_user.jmx', report: 'Report_modrdn_ldap_user.jtl' }
+    - { test: 'Test_delete_ldap_user.jmx', report: 'Report_delete_ldap_user.jtl' }
+    - { test: 'Test_add_ldap_user_CSV.jmx', report: 'Report_add_ldap_user_CSV.jtl' }
+    - { test: 'Test_user_replication.jmx', report: 'Report_user_replication.jtl' }
+    - { test: 'Test_dirserv_dircache_sync.jmx', report: 'Report_dirserv_dircache_sync.jtl' }
+    - { test: 'Test_search_multiple_user.jmx', report: 'Report_search_multiple_user.jtl' }
+    - { test: 'Test_search_user_dircache.jmx', report: 'Report_search_user_dircache.jtl' }
+    - { test: 'Test_write_through_dircache.jmx', report: 'Report_write_through_dircache.jtl' }
+    - { test: 'Test_primary_and_secondary_server_sync.jmx', report: 'Report_primary_and_secondary_server_sync.jtl' }
+    - { test: 'Test_failover_directory_server.jmx', report: 'Report_failover_directory_server.jtl' }
+    - { test: 'Test_fallback_primary_directory_server.jmx', report: 'Report_fallback_primary_directory_server.jtl' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-ldap' ]
+

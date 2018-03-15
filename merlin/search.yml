@@ -1,0 +1,8 @@
+---
+- hosts: search
+  serial: 1
+  roles:
+    - jdk
+    - common
+    - owm-common
+    - sncr-search

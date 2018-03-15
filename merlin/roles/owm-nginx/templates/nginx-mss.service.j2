@@ -1,0 +1,22 @@
+[Unit]
+Description=The nginx HTTP and reverse proxy server
+After=network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=forking
+PIDFile=/run/nginx/nginx-mss.pid
+User={{emailmx_user[0].username}}
+Group={{emailmx_user[0].username}}
+PermissionsStartOnly=true
+ExecStartPre=/bin/mkdir -p /run/nginx
+ExecStartPre=/bin/chown -R {{emailmx_user[0].username}}:{{emailmx_user[0].username}} /run/nginx
+ExecStartPre=/usr/bin/rm -f /run/nginx-mss.pid
+ExecStart={{ nginx_home_dir }}/nginx_mss/nginx/sbin/nginx -c {{ nginx_home_dir }}/nginx_mss/nginx/conf/nginx.conf -p {{ nginx_home_dir }}/nginx_mss/nginx
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
+TimeoutStopSec=5
+KillMode=process
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

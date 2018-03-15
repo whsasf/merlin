@@ -1,0 +1,6 @@
+#!/bin/bash
+export JAVA_HOME=/usr/java/jdk{{JDK_VERSION.stdout}}
+export MIRA_ROOT=/opt/data/rg/mira
+echo "Starting Razorgate..." 
+$MIRA_ROOT/etc/init.d/razorgate start
+

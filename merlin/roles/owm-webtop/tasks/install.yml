@@ -1,0 +1,124 @@
+- debug:
+    msg: "Installing {{package.name}}-{{package.version}}"
+
+- name: Checking whether package {{package.name}} is already installed
+  command: rpm -q {{package.name}}
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  check_mode: no
+  tags: ['webtop-install']
+
+# If package is not installed, and optional do not install it
+
+- include: verify_package.yml pack="{{package}}"
+  check_mode: no
+  when: rpm_check.rc != 0 and package.optional == 'no'
+
+- name: Installing {{package.name}} package
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} rpm -ivh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/{{package.name}}-{{package.version}}{{verif_arch}}.rpm'
+  when: rpm_check.rc != 0 and package.optional == 'no'
+  tags: ['webtop-install']
+    
+# Handle Upgrade / Downgrade
+
+# Check package specific version
+- name: Get package version of RPM
+  shell: "`which yum` list installed {{package.name}} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: ['webtop-install']
+  check_mode: no
+  
+- debug:
+     msg: "System has {{package.name}}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0 
+  tags: ['webtop-install']
+
+# See which version is higher or lower
+- name: Compare installed RPM version with expected version
+  shell: '/tmp/compare_versions.sh {{package.version}} {{rpm_version.stdout}}'
+  register: version_comparison
+  ignore_errors: yes
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: ['webtop-install']
+  check_mode: no
+
+- debug:
+     msg: "Keeping the existing {{package.name}}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0 and version_comparison.rc == 0
+  tags: ['webtop-install']
+
+- include: verify_package.yml pack="{{package}}"
+  check_mode: no
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+
+- debug: 
+    msg: "Do you want to continue the {{package.name}} upgrade from {{rpm_version.stdout}} to {{package.version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  
+- debug: 
+    msg: "Do you want to continue the {{package.name}} downgrade from {{rpm_version.stdout}} to {{package.version}} ?" 
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+
+- pause: seconds=30
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  
+- name: Save {{package.name}}-{{package.version}} arch value
+  set_fact:
+    arch: "{{verif_arch}}"
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+
+- name: Stopping webtop
+  shell: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/bin/imservctrl stop webtop'
+  register: service_stop
+  failed_when: service_stop.rc != 0 and servicetop_stop.rc != 1
+  ignore_errors: True
+  changed_when: no
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  tags: ['webtop-install']
+
+# If package is already installed, and is a lower version do an upgrade
+
+- name: Upgrade {{package.name}} from {{rpm_version.stdout}} to {{package.version}}
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} rpm -Uvh --nodeps --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/{{package.name}}-{{package.version}}{{arch}}.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: ['webtop-install']
+
+# If application is already installed, and is a higher version, downgrade
+# Downgrade Step #1 - remove old package
+
+- name: Downgrade Step 1, remove old {{package.name}}-{{rpm_version.stdout}} package
+  shell: 'rpm -e --nodeps {{package.name}}-{{rpm_version.stdout}}'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: ['webtop-install']
+
+# Downgrade Step #2 - install older package
+
+- name: Downgrade Step 2, install older {{package.name}}-{{package.version}} package
+  shell: 'INSTALL_USER={{emailmx_user[0].username}} INSTALL_GROUP={{emailmx_user[0].username}} rpm -ivh --prefix={{emailmx_user[0].home}} {{owm_repo_url}}/{{package.name}}-{{package.version}}{{arch}}.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: ['webtop-install']
+
+# Check specific version
+- name: Get new version of RPM
+  shell: "`which yum` list installed {{package.name}} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  changed_when: False
+  tags: ['webtop-install']
+  check_mode: no
+
+- debug:
+     msg: "System has {{package.name}}-{{rpm_version.stdout}} installed (upgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: ['webtop-install']
+
+- debug:
+     msg: "System has {{package.name}}-{{rpm_version.stdout}} installed (downgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: ['webtop-install']
+

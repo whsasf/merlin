@@ -1,0 +1,4 @@
+---
+stress_ng_version: "0.03.11"
+stress_ng_second: "600"
+cpu_stressors: "0"

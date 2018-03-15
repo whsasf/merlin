@@ -1,0 +1,211 @@
+input {
+  {% if appsuite_log_path is defined %}
+  file {
+    path => "{{appsuite_log_path}}/appsuite.log"
+    type => "appsuiteLogs"
+  }
+  file {
+    path => "{{appsuite_log_path}}/appsuite.stats"
+    type => "appsuiteStats"
+  }
+  {% endif %}
+  {% if mysqld_log_path is defined %}
+  file {
+    path => "{{mysqld_log_path}}/mysqld.log"
+    type => "mySqldLogs"
+  }
+  {% endif %}
+  {% if cass_user is defined %}
+  file {
+    path => [
+	"{{cass_user[0].home}}/cassandra-meta/log/system.log",
+	"{{cass_user[0].home}}/cassandra-blob/log/system.log"
+	]
+    type => "cassandraData"
+  }
+  {% endif %}
+  {% if emailmx_user is defined %}
+  {% if webtop_webmail_name is defined %}
+  file {
+    path => "{{emailmx_user[0].home}}/webtop/webapps/{{webtop_webmail_name}}/WEB-INF/logs/webtop.log"
+    type => "webtopLog"
+  }
+  {% endif %}
+  file {
+    path => "{{emailmx_user[0].home}}/mxos/logs/mxos.log"
+    type => "mxosLog"
+  }
+  file {
+    path => "{{emailmx_user[0].home}}/mxos/logs/mxos.stats"
+    type => "mxosStat"
+  }
+  file {
+    path => [
+	"{{emailmx_user[0].home}}/log/mta.trace",
+	"{{emailmx_user[0].home}}/log/popserv.trace",
+	"{{emailmx_user[0].home}}/log/imapserv.trace"
+	]
+    type => "mtaPopImaptrace"
+  }
+  file {
+    path => "{{emailmx_user[0].home}}/log/mss.trace"
+    type => "mssTrace"
+  }
+  file {
+    path => "{{emailmx_user[0].home}}/log/imqueueserv.trace"
+    type => "queueManagerTrace"
+  }
+  file {
+    path => "{{emailmx_user[0].home}}/log/imextserv.trace"
+    type => "imextconfimservTrace"
+  }
+  file {
+    path => [   "{{emailmx_user[0].home}}/log/mta.stat", 
+		"{{emailmx_user[0].home}}/log/mss.stat",
+		"{{emailmx_user[0].home}}/log/pop.stat",
+		"{{emailmx_user[0].home}}/log/imapserv.stat",
+		"{{emailmx_user[0].home}}/log/imconfserv.stat",
+		"{{emailmx_user[0].home}}/log/imdirserv.stat",
+		"{{emailmx_user[0].home}}/log/imdircacheserv.stat",
+		"{{emailmx_user[0].home}}/log/imqueueserv.stat",
+		"{{emailmx_user[0].home}}/log/imconfxlate.stat",
+		"{{emailmx_user[0].home}}/log/imservcall.stat",
+		"{{emailmx_user[0].home}}/log/imconfget.stat",
+		"{{emailmx_user[0].home}}/log/immgrserv.stat",
+		"{{emailmx_user[0].home}}/log/imextserv.stat",
+		"{{emailmx_user[0].home}}/log/imconfcontrol.stat",
+		"{{emailmx_user[0].home}}/log/imservshutdown.stat",
+		"{{emailmx_user[0].home}}/log/imctrl.stat",
+		"{{emailmx_user[0].home}}/log/imdirbuild.stat",
+		"{{emailmx_user[0].home}}/log/imdirdump.stat",
+		"{{emailmx_user[0].home}}/log/imdirpart.stat",
+		"{{emailmx_user[0].home}}/log/imdirmake.stat",
+		"{{emailmx_user[0].home}}/log/imconfget.stat",
+		"{{emailmx_user[0].home}}/log/popserv.stat",
+		"{{emailmx_user[0].home}}/log/imdirsync.stat"  ]
+	type => "mxStat"
+  }
+  file {
+    path => [   "{{emailmx_user[0].home}}/log/mta.log", 
+		"{{emailmx_user[0].home}}/log/mss.log",
+		"{{emailmx_user[0].home}}/log/pop.log",
+		"{{emailmx_user[0].home}}/log/imapserv.log",
+		"{{emailmx_user[0].home}}/log/imconfserv.log",
+		"{{emailmx_user[0].home}}/log/imdirserv.log",
+		"{{emailmx_user[0].home}}/log/imdircacheserv.log",
+		"{{emailmx_user[0].home}}/log/imqueueserv.log",
+		"{{emailmx_user[0].home}}/log/imconfxlate.log",
+		"{{emailmx_user[0].home}}/log/imservcall.log",
+		"{{emailmx_user[0].home}}/log/imconfget.log",
+		"{{emailmx_user[0].home}}/log/immgrserv.log",
+		"{{emailmx_user[0].home}}/log/imextserv.log",
+		"{{emailmx_user[0].home}}/log/imconfcontrol.log",
+		"{{emailmx_user[0].home}}/log/imservshutdown.log",
+		"{{emailmx_user[0].home}}/log/imctrl.log",
+		"{{emailmx_user[0].home}}/log/imdirbuild.log",
+		"{{emailmx_user[0].home}}/log/imdirdump.log",
+		"{{emailmx_user[0].home}}/log/imdirpart.log",
+		"{{emailmx_user[0].home}}/log/imdirmake.log",
+		"{{emailmx_user[0].home}}/log/imconfget.log",
+		"{{emailmx_user[0].home}}/log/popserv.log",
+		"{{emailmx_user[0].home}}/log/imdirsync.log"  ]
+	type => "mxLog"
+  }
+  {% endif %}
+  file {
+    path => "{{nagios_log_path}}/nagios.log"
+    type => "nagios"
+  }
+  {% if nginx_home_dir is defined %}
+  file {
+    path => "{{ nginx_home_dir }}/*/nginx{{ owm_nginx_version }}/logs/access.log"
+    type => "nginxAccess"
+  }
+  file {
+    path => "{{ nginx_home_dir }}/*/nginx{{ owm_nginx_version }}/logs/error.log"
+    type => "nginxError"
+  }
+  {% endif %}
+  {% if python_script_path is defined %}
+  file {
+    path => "{{python_script_path}}/python_connect.log"
+    type => "pythonLog"
+  }
+  {% endif %}
+  {% if scality_log_path is defined %}
+  file {
+    path => "{{scality_log_path}}/scality-rest-connector/restapi.log"
+    type => "restapiScality"
+  }
+  file {
+    path => "{{scality_log_path}}/*/slist.log"
+    type => "slistScality"
+  }
+  file {
+    path => "{{scality_log_path}}/*/pm.log"
+    type => "pmScality"
+  }
+  file {
+    path => "{{scality_log_path}}/*/netscript.log"
+    type => "netScriptScality"
+  }
+  file {
+    path => "{{scality_log_path}}/*/chord.log"
+    type => "chordScality"
+  }
+  file {
+    path => "{{scality_log_path}}/*/chunkapi.log"
+    type => "chunkScality"
+  }
+  {% endif %}
+  {% if install_path is defined %}
+  file {
+    path => "{{install_path}}/mira/usr/store/logs/cma-agent-*.log"
+    type => "cma_agent"
+  }
+  file {
+    path => "{{install_path}}/mira/usr/store/logs/cma-alert-store-*.log"
+    type => "cma_alert_store"
+  }
+  file {
+    path => "{{install_path}}/mira/usr/store/logs/cma-audit-*.log"
+    type => "cma_audit"
+  }
+  file {
+    path => "{{install_path}}/mira/usr/store/logs/cma-service-rgt-*.log"
+    type => "cma_service_rgt"
+  }
+  file {
+    path => "{{install_path}}/mira/usr/store/logs/cma-system-*.log"
+    type => "cma_system"
+  }
+  file {
+    path => "{{install_path}}/mira/usr/store/logs/cmc-audit-*.log"
+    type => "cmc_audit"
+  }
+  file {
+    path => "{{install_path}}/mira/usr/store/logs/cmc-console-*.log"
+    type => "cmc_console"
+  }
+  file {
+    path => "{{install_path}}/mira/usr/store/logs/cmc-system-*.log"
+    type => "cmc_system"
+  }
+  file {
+    path => "{{install_path}}/mira/usr/store/logs/cmc-webtop-*.log"
+    type => "cmc_webtop"
+  }
+  file {
+    path => "{{install_path}}/mira/usr/store/logs/counters-*.log"
+    type => "rg_counters"
+  }
+  file {
+    path => "{{install_path}}/mira/usr/store/logs/smtp-*.log"
+    type => "rg_smtp"
+  }
+  {% endif %}
+}
+output {
+  redis { host => [{% for host in groups[node_site+'-redis'] %}"{{hostvars[host]['ansible_ssh_host']}}",{% endfor %}ENDOFLOOP ] shuffle_hosts => true data_type => "list" key => "logstash" }
+}
+

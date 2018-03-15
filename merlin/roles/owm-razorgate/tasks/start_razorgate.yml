@@ -1,0 +1,42 @@
+- name: Create the directory for scripts
+  file: path=/opt/data/scripts state=directory
+  tags: ['owm-razorgate']
+
+- name: Initializing stop-rg.sh file under opt/data/scripts 
+  template:
+    src: "stop-rg.sh.j2"
+    dest: "/opt/data/scripts/stop-rg.sh"
+    owner: "root"
+    group: "root"
+    mode: 0755
+  tags: ['owm-razorgate']
+
+- name: Stop the RG
+  shell: /opt/data/scripts/stop-rg.sh
+  register: STOPRG  
+  ignore_errors: true
+  failed_when: STOPRG.rc >1
+  tags: ['owm-razorgate']
+
+- name: Initializing start-rg.sh file under opt/data/scripts
+  template:
+    src: "start-rg.sh.j2"
+    dest: "/opt/data/scripts/start-rg.sh"
+    owner: "root"
+    group: "root"
+    mode: 0755
+  tags: ['owm-razorgate']
+
+- name: Start the RG
+  shell: /opt/data/scripts/start-rg.sh
+  register: STARTRG
+  ignore_errors: true
+  failed_when: STARTRG.rc >1
+  tags: ['owm-razorgate']  
+
+- name: Check the razorgate Status
+  command: /opt/data/rg/mira/etc/init.d/razorgate status
+  register: RGSTATUS
+  ignore_errors: true
+  failed_when: RGSTATUS.rc!=6
+  tags: ['owm-razorgate']

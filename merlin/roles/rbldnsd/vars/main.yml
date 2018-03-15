@@ -1,0 +1,4 @@
+---
+rbldnsd_service_name: rbldnsd
+rbldnsd_pkgs:
+  - rbldnsd

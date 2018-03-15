@@ -1,0 +1,22 @@
+#! /bin/bash
+
+# Lock the config server
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -lockserver'
+
+{% for site in sites %}{% 
+	if groups[site+'-searchcass'] is defined %}
+
+# site={{ site }}
+
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/search/cassandraPort"="{{cassandra_meta_native_transport_port}}""'
+
+{%		for i in groups[site+'-searchcass'] %}{%
+			if loop.last %}
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/search/cassandraEndpoints"="{{ groups[site+'-searchcass'] | join ('\\\\n' ) }}""'
+{%			endif %}{%
+		endfor %}{%
+	endif %}{%
+endfor %}
+
+# Unlock the config server
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -unlockserver'

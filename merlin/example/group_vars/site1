@@ -1,0 +1,5 @@
+ntp_config_server: [ '3.pool.ntp.org', '2.pool.ntp.org', '1.pool.ntp.org', '0.pool.ntp.org' ]
+
+# Required by the Mx components 
+group_site: site1
+cluster_name: site1-cluster

@@ -1,0 +1,14 @@
+---
+#- include: bootstrap.yml
+- include: initssh.yml --ask-pass
+- include: cassmeta.yml
+- include: cassblob.yml
+- include: directory.yml
+- include: mxos.yml
+- include: mss.yml
+- include: queue.yml
+- include: qadminsearch.yml
+- include: qservice.yml
+- include: fep.yml
+- include: pabcal.yml
+- include: search.yml

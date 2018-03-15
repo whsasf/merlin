@@ -1,0 +1,10 @@
+#!/bin/bash
+newPass=hacluster
+reTypePass=hacluster
+(
+sleep 2
+echo $newPass
+sleep 2
+echo $reTypePass
+
+sleep 2 ) | passwd hacluster

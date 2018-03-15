@@ -1,0 +1,9 @@
+---
+
+- hosts: all
+  roles:
+    - common
+    - owm-memtester
+    - owm-bonnie
+    - owm-stress-ng
+    - owm-iperf

@@ -1,0 +1,23 @@
+---
+- name: Create directories for RG
+  file: path=/opt/merlin/jmeter/{{ item }}/webtop state=directory
+  with_items:
+    - "tests"
+    - "reports"
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-webtop' ]
+
+- name: Put test cases for RG
+  template: src=webtop/{{ item.test_case }}.j2 dest=/opt/merlin/jmeter/tests/webtop/{{ item.test_case }}
+  with_items:
+    - { test_case: 'Test_Webtop_Login_and_Logout.jmx' }
+    - { test_case: 'Test_Webtop_Compose_and_send_mail.jmx' }
+    - { test_case: 'Test_Webtop_Send_Mail_MTA.jmx' }  
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-webtop' ]
+
+- name: Execute JMeter test cases for RG
+  shell: /opt/merlin/jmeter/apache-jmeter-{{jmeter_version}}/bin/jmeter -n -t /opt/merlin/jmeter/tests/webtop/{{ item.test }} -l /opt/merlin/jmeter/reports/webtop/{{ item.report }}
+  with_items:
+    - { test: 'Test_Webtop_Login_and_Logout.jmx', report: 'Report_Webtop_Login_and_Logout.jtl' }
+    - { test: 'Test_Webtop_Compose_and_send_mail.jmx', report: 'Report_Webtop_Compose_and_send_mail.jtl' }
+    - { test: 'Test_Webtop_Send_Mail_MTA.jmx', report: 'Report_Webtop_Send_Mail_MTA.jtl' }
+  tags: [ 'owm-functionaltest', 'owm-functionaltest-webtop' ]

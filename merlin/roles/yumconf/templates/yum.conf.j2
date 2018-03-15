@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+{% for section, options in yumconf_conf.iteritems() -%}
+  {{ "\n" }}[{{ section }}]{{ "\n" }}
+  {%- for key, value in options.iteritems() | sort -%}
+    {{ key }}={{ value }}{{ "\n" }}
+  {%- endfor %}
+{% endfor %}

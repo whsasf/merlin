@@ -1,0 +1,10 @@
+---
+- hosts: confserv
+  vars:
+      initiate: 3
+  serial: 1
+  roles:
+    - common
+    - jdk
+    - owm-common
+    - owm-confserv

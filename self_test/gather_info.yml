@@ -1,0 +1,6 @@
+---
+- name: gather info of dest server
+  hosts: haha
+  tasks:
+  - 
+    debug: msg="the os info is {{ansible_distribution}}"

@@ -1,0 +1,6 @@
+---
+- name: Configure yum.conf
+  template:
+    src: yum.conf.j2
+    dest: /etc/yum.conf
+  tags: [ 'configuration', 'yumconf' ]

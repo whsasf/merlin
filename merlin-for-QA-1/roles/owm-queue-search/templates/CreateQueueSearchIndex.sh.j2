@@ -1,0 +1,32 @@
+#!/bin/bash
+
+{% if groups[node_site+'-elk'] is defined %}{%
+	for host in groups[node_site+'-elk'] %}{%
+		if loop.first %}
+
+CHECK=true
+i=1
+while $CHECK; do
+    
+    
+    ST=$(curl -L http://{{ host }}:{{ hostvars[host]['elasticsearch_http_port'] }}/_cluster/health?pretty=true|grep status|awk -F "\"" '{ print $4 }')
+    
+    if [ "green" == "$ST" ]; then
+        CHECK=false;
+        echo "ElasticSearch Cluster is now up and running ($ST)"
+        echo "Registering queue service on ElasticSearch"
+        curl -XPUT 'http://{{ host }}:{{ hostvars[host]['elasticsearch_http_port'] }}/messagerecords?pretty' -d'{"mappings": {"external": {"date_detection": false,"properties": {"submittime": {"type": "date","format": "yyyyMMddHHmmssSSS"},"attempt": {"type": "long"},"messageid": {"type": "string"},"queuename": {"type":"string"},"size": {"type": "long"}},"_ttl":{"enabled": true,"default": "5d"}}}}'
+    else
+        let i=i+1
+        echo "Waiting for ElasticSearch Cluster ($ST)..."
+        if [ $i -eq 3 ];then
+        	curl -XPUT "http://{{ host }}:{{ hostvars[host]['elasticsearch_http_port'] }}/_settings" -d' {  "number_of_replicas" : 0 } '
+        fi
+        sleep 15
+    fi
+    
+done;
+
+{%		endif %}{%
+	endfor %}{%
+endif %}

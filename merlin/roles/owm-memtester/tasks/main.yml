@@ -1,0 +1,40 @@
+---
+
+- name: Check processes for memtester
+  shell: ps -ef | grep -i memtester
+  register: memcheck
+  tags: [ 'owm-memtester' ]
+
+- name: Set flag for memtester install
+  set_fact:
+      meminstallcheck: "{% for item in memcheck.stdout_lines %}{% if 'install memtester' in item %}true{% endif %}{% endfor %}"
+  tags: [ 'owm-memtester' ]
+  
+- name: Install the memtester tool
+  yum: name=memtester state=present
+  when: meminstallcheck != "true"
+  tags: [ 'owm-memtester' ]
+
+- name: Create a directory to save the report
+  file: name=/opt/merlin/memtester state=directory
+  tags: [ 'owm-memtester' ]
+
+- name: Check processes for memtester run
+  shell: ps -ef | grep -i memtester
+  register: memtestrun
+  tags: [ 'owm-memtester' ]
+
+- name: Set flag for memtester run
+  set_fact:
+      memtesterrun: "{% for item in memtestrun.stdout_lines %}{% if 'memtester {{ memtory_size }}' in item %}true{% endif %}{% endfor %}"
+  tags: [ 'owm-memtester' ]
+  
+- name: Execute the memtester tool
+  shell: memtester {{ memtory_size }} {{ number_of_iterations }} >> /opt/merlin/memtester/{{ report_file }}
+  when: memtesterrun != "true"
+  register: memtester
+  tags: [ 'owm-memtester' ]
+
+- fail: msg='ERROR memtester stress tool failed check the /opt/merlin/memtester/{{ report_file }} for more detail.'
+  when: memtester.rc != 0
+  tags: [ 'owm-memtester' ]

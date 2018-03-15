@@ -1,0 +1,14 @@
+---
+#- name: Install OWM repo.
+#  yum: name="{{ owm_repo_rpm_url }}" state=present
+#  tags: [ 'package', 'owm-repo' ]
+#
+#- name: Import OWM GPG key.
+#  rpm_key: key="{{ owm_repo_gpg_key_location }}" state=present
+#  tags: [ 'package', 'owm-repo' ]
+- name: Install SNCR repo.
+  yum_repository:
+    name: sncr
+    description: SNCR messaging platform repo
+    baseurl: "{{ owm_repo_url }}"
+    gpgcheck: no

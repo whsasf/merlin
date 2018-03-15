@@ -1,0 +1,130 @@
+---
+- name: Create temp directory to store metadata backup file
+  file: path={{cass_user[0].home}}/cassmeta-rec state=directory mode=0755
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+
+- name: Copy the metadata backup file from backup server to cassandra server home directory
+  shell: 'rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{cass_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress root@{{backupserver_ip_address}}:{{backup_server_path}}/cassandra-meta-{{inventory_hostname}}-{{cassmeta_backup_date}}.tar.gz {{cass_user[0].home}}/cassmeta-rec'
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+
+- name: Untar metadata backup file into user home directory
+  unarchive: src={{cass_user[0].home}}/cassmeta-rec/cassandra-meta-{{inventory_hostname}}-{{cassmeta_backup_date}}.tar.gz dest={{cass_user[0].home}}/cassmeta-rec copy=no
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+
+- name: Stop Cassandra server
+  command: 'nohup {{cass_user[0].home}}/cassandra-{{ item }}/apache-cassandra-{{cassandra_source_version}}/bin/stop-server'
+  when: "inventory_hostname in groups['{{ node_site }}-cass{{ item }}']"
+  with_items:
+     - "meta"
+     - "blob"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+  
+- name: Kill Cassandra process
+  shell: ps axf | grep cass | grep -v grep | awk '{print "kill -9 " $1}' | sh
+  tags: [ 'owm-recover','cassmeta' ]
+
+- name: Set timestamp variable
+  shell: date '+%Y%m%d_%H%M' 
+  register: timestamp 
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"  
+  tags: [ 'owm-recover','cassmeta' ]
+
+- name: Create directory to store existing data directory
+  file: path={{cass_user[0].home}}/cassandra-meta/data_{{timestamp.stdout}} state=directory mode=0755
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+
+- name: backup existing data directory
+  command: mv {{cass_user[0].home}}/cassandra-meta/data {{cass_user[0].home}}/cassandra-meta/data_{{timestamp.stdout}}
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+
+- name: Update casssandra data file
+  command: mv {{cass_user[0].home}}/cassmeta-rec/data {{cass_user[0].home}}/cassandra-meta
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+ 
+- name: Create directory to store existing saved_caches directory
+  file: path={{cass_user[0].home}}/cassandra-meta/saved_caches_{{timestamp.stdout}} state=directory mode=0755
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+  
+- name: backup existing saved_caches directory
+  command: mv {{cass_user[0].home}}/cassandra-meta/saved_caches {{cass_user[0].home}}/cassandra-meta/saved_caches_{{timestamp.stdout}}
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+  
+- name: Update casssandra saved saved_caches files
+  command: mv {{cass_user[0].home}}/cassmeta-rec/saved_caches {{cass_user[0].home}}/cassandra-meta
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+
+- name: Create directory to store existing commitlog directory
+  file: path={{cass_user[0].home}}/cassandra-meta/commitlog_{{timestamp.stdout}} state=directory mode=0755
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+  
+- name: backup existing commitlog directory
+  command: mv {{cass_user[0].home}}/cassandra-meta/commitlog {{cass_user[0].home}}/cassandra-meta/commitlog_{{timestamp.stdout}}
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+  
+- name: Update casssandra commitlog files
+  command: mv {{cass_user[0].home}}/cassmeta-rec/commitlog {{cass_user[0].home}}/cassandra-meta
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+
+- name: Start Cassandra server
+  command: 'nohup {{cass_user[0].home}}/cassandra-{{ item }}/apache-cassandra-{{cassandra_source_version}}/bin/cassandra'
+  when: "inventory_hostname in groups['{{ node_site }}-cass{{ item }}']"
+  with_items:
+     - "meta"
+     - "blob"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]
+
+- name: Repair metadata
+  command: "{{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/bin/nodetool -h {{hostvars[inventory_hostname]['ansible_ssh_host']}} -p 7199 repair -pr"
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]  
+
+- name: After recovery of Cassandra meta server, delete temp directory from home directory
+  file: path={{cass_user[0].home}}/cassmeta-rec state=absent
+  when: "inventory_hostname in groups['{{ node_site }}-cassmeta']"
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  tags: [ 'owm-recover','cassmeta' ]  

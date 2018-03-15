@@ -1,0 +1,9 @@
+---
+- hosts: smtpout
+  roles:
+    - common
+    - jdk
+    - owm-common
+    - owm-razorgate
+# Monitor UI is now a separate component that installs the agents it needs
+#    - owm-logstash-shipper

@@ -1,0 +1,39 @@
+# {{ ansible_managed }}
+
+define hostgroup {
+  hostgroup_name queservers 
+  alias Queue Servers
+}
+{% if groups['queue'] is defined %}
+{% for host in groups['queue'] %}
+
+define host {
+  use                     linux-server
+  host_name               {{ host }}
+  alias                   {{ host }}
+  address                 {{ hostvars[host].ansible_ssh_host }}
+  hostgroups              queservers 
+}
+{% endfor %}
+
+define service {
+  use                     local-service
+  hostgroup_name          queservers
+  service_description     Mx immgrserv version
+  check_command           get_mx_version!5003!!!!!!!
+}
+
+define service {
+  use                     local-service
+  hostgroup_name          queservers
+  service_description     Mx imdircacheserv version
+  check_command           get_mx_version!5008!!!!!!!
+}
+
+define service {
+  use                     local-service
+  hostgroup_name          queservers
+  service_description     Mx imqueueserv version
+  check_command           get_mx_version!5017!!!!!!!
+}
+{% endif %}

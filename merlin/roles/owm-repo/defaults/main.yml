@@ -1,0 +1,2 @@
+owm_repo_rpm_url: "http://owm-rpm-repo.owmessaging.com/yum/el6/noarch/owm-rpm-repo-1-0.1.noarch.rpm"
+owm_repo_gpg_key_location: "/etc/pki/rpm-gpg/RPM-GPG-KEY-owm-rpm-repo"

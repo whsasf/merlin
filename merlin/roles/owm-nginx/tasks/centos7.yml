@@ -1,0 +1,18 @@
+---
+- name: Nginx Service Unit
+  template: 
+    src: "nginx-{{item}}.service.j2"
+    dest: /etc/systemd/system/nginx-{{item}}.service
+    mode: 0644
+  with_items: "{{ node_component }}"
+  tags: [ 'owm-affinity', 'systemd-unit', 'startup-script' ]
+    
+- name: Reload Daemon
+  shell: systemctl daemon-reload
+  tags: [ 'owm-affinity', 'systemd-unit', 'startup-script' ]
+    
+- name: Startup Nginx Nodes
+  service: name=nginx-{{item}} state=started enabled=yes
+  with_items: "{{ node_component }}"
+  tags: [ 'owm-affinity', 'owm-affinity-startup', 'startup-script' ]
+

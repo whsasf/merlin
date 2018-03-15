@@ -1,0 +1,8 @@
+#!/bin/bash
+#{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/bin/nodetool -h {{hostvars[inventory_hostname]['ansible_ssh_host']}} -p {{cassandra_jmx_port|default(7299)}} compact
+#{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/bin/nodetool -h {{hostvars[inventory_hostname]['ansible_ssh_host']}} -p {{cassandra_jmx_port|default(7299)}} repair -pr
+#{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/bin/nodetool -h {{hostvars[inventory_hostname]['ansible_ssh_host']}} -p {{cassandra_jmx_port|default(7299)}} cleanup
+
+{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/bin/nodetool -h 127.0.0.1 -p {{cassandra_jmx_port|default(7299)}} compact
+{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/bin/nodetool -h 127.0.0.1 -p {{cassandra_jmx_port|default(7299)}} repair -pr
+{{cass_user[0].home}}/cassandra-blob/apache-cassandra-{{cassandra_source_version}}/bin/nodetool -h 127.0.0.1 -p {{cassandra_jmx_port|default(7299)}} cleanup

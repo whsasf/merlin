@@ -1,0 +1,6 @@
+---
+- hosts: lawfulintercept
+  roles:
+    - common
+    - jdk
+    - owm-lawfulinterception

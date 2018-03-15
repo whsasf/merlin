@@ -1,0 +1,81 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Determine cluster name
+  set_fact:
+    node_cluster: "{{ item }}"
+  with_items: "{{ clusters }}"
+  when: hostvars[inventory_hostname]['clusterId'] == "{{ item }}"
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Create the {{ li_home }} directory
+  file: path={{ li_home }} state=directory
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Create directory for transfer keys for sync the monitor file
+  file: path={{ li_home }}/rsync_transfer_keys state=directory mode=0755
+  tags: [ 'owm-lawfulinterception' ]
+  
+- name: Create directory to run script file for sync the monitor file
+  file: path={{ li_home }}/scripts state=directory mode=0755
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Copy rsa private key for sync the monitor file
+  copy: src=~/.ssh/id_rsa dest={{ li_home }}/rsync_transfer_keys/rsync_transfer.rsa owner=root group=root mode=0600
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Copy rsa public key for sync the monitor file
+  copy: src=~/.ssh/id_rsa.pub dest={{ li_home }}/rsync_transfer_keys/rsync_transfer.pub owner=root group=root mode=0600
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Copy script file to sync the monitor file
+  template:
+    src: "sync_monitor.sh.j2"
+    dest: "{{ li_home }}/scripts/sync_monitor.sh"
+    owner: "root"
+    group: "root"
+    mode: 0644
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Get LI tool package
+  get_url: url="{{owm_tar_url}}/MonitoringTool-{{li_version}}-SNAPSHOT.tar.gz" dest="{{ li_home }}"
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Untar LI tar.gz at root
+  unarchive: src="{{ li_home }}/MonitoringTool-{{li_version}}-SNAPSHOT.tar.gz" dest="{{ li_home }}" copy=no
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Create folder for monitor storage.
+  file: path={{ li_home }}/notification_storage state=directory
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Place monitor.properties file
+  template:
+    src: "monitor.properties.j2"
+    dest: "{{ li_home }}/MonitoringTool-{{li_version}}-SNAPSHOT/config/monitor.properties"
+    mode: 0664
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Change Permission of jmxremote.access file.
+  file: path={{ li_home }}/MonitoringTool-{{li_version}}-SNAPSHOT/config/jmxremote.access mode=600
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Change Permission of jmxremote.password file.
+  file: path={{ li_home }}/MonitoringTool-{{li_version}}-SNAPSHOT/config/jmxremote.password mode=600
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Start the Lawful Interception Tool
+  command: ./monitor.sh start chdir={{ li_home }}/MonitoringTool-{{li_version}}-SNAPSHOT
+  async: 5
+  poll: 0
+  tags: [ 'owm-lawfulinterception' ]
+
+- name: Create cron job for sync the monitor file for every one minute
+  cron: name="Cron Job for rysnc the monitor file" user="root" minute="{{sync_monitor[0].minute}}" hour="{{sync_monitor[0].hour}}" day="{{sync_monitor[0].day}}" month="{{sync_monitor[0].month}}" weekday="{{sync_monitor[0].weekday}}" job="bash {{ li_home }}/scripts/sync_monitor.sh 2> /dev/null 2>&1"
+  when: "hostvars[inventory_hostname]['primary'] is defined"
+  tags: [ 'owm-lawfulinterception' ]

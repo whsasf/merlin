@@ -1,0 +1,230 @@
+---
+- set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'sncr-search', 'sncr-search-init' ]
+
+- name: Determine configuration server host
+  set_fact:
+      conf_server_name: "{{ hostvars[item]['inventory_hostname'] }}"
+  with_items: "{{ groups['directory'] }}"
+  when: "hostvars[item]['primary'] is defined"
+  tags: [ 'sncr-search', 'sncr-search-init' ]
+
+- name: Check if sncr-search is installed
+  command: rpm -q sncr-search
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  tags: [ 'sncr-search' ]
+  check_mode: no
+
+- name: Fresh install sncr-search
+  shell: 'rpm -ivh {{owm_repo_url}}/sncr-search-{{sncr_search_version}}.noarch.rpm'
+  when: rpm_check.rc != 0
+  tags: [ 'sncr-search' ]
+
+#
+# Handle Upgrade / Downgrade
+#
+
+- name: Set Package Name
+  set_fact: 
+    package_name: "sncr-search"
+  when: rpm_check.rc == 0
+  tags: [ 'sncr-search' ]
+
+# Check specific version
+- name: Get version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'sncr-search' ]
+  check_mode: no
+
+
+- debug:
+    msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0
+  tags: [ 'sncr-search' ]
+
+
+# See which version is higher or lower
+
+- name: Compare installed RPM version with expected version
+  shell: '/tmp/compare_versions.sh {{sncr_search_version}} {{rpm_version.stdout}}'
+  register: version_comparison
+  ignore_errors: yes
+  when: rpm_check.rc == 0
+  changed_when: False
+  tags: [ 'sncr-search' ]
+  check_mode: no
+
+
+- debug:
+    msg: "Keeping the existing {{ package_name }}-{{rpm_version.stdout}} installed"
+  when: rpm_check.rc == 0 and version_comparison.rc == 0
+  tags: [ 'sncr-search' ]
+
+
+
+# Try to catch the case that user specified a RPM package that is not in the {{owm_repo_url}}
+- name: Ensure {{owm_repo_url}} contains {{ package_name }}-{{sncr_search_version}} RPM
+  uri: 
+    url: "{{owm_repo_url}}/{{ package_name }}-{{sncr_search_version}}.noarch.rpm"
+    method: GET
+    status_code: 200
+  register: rpmpkg_file
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  check_mode: no
+
+
+
+- debug: 
+   msg: "{{ package_name }}-{{sncr_search_version}}.noarch.rpm is not found in {{owm_repo_url}}"
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ) and rpmpkg_file.content_type != "application/x-rpm"
+
+
+- name: Abort if the {{ package_name }}-{{emailmx_version}} RPM  is missing
+  meta: end_play
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ) and rpmpkg_file.content_type != "application/x-rpm"
+  check_mode: no
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name }} upgrade from {{rpm_version.stdout}} to {{sncr_search_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1 
+
+- debug: 
+     msg: "Do you want to continue the {{ package_name }} downgrade from {{rpm_version.stdout}} to {{sncr_search_version}} ?"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2 
+
+- pause: seconds=30
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+
+
+- name: Stop the Search service
+  shell: "/etc/init.d/search stop"
+  register: search_stop
+  failed_when: search_stop.rc != 0 and search_stop.rc != 1
+  ignore_errors: True
+  changed_when: no
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  tags: [ 'sncr-search' ]
+
+
+
+# If application is already installed, and is a lower version do an upgrade
+
+- name: Upgrade {{ package_name }} from {{rpm_version.stdout}} to {{sncr_search_version}}
+  shell: 'rpm -Uvh {{owm_repo_url}}/sncr-search-{{sncr_search_version}}.noarch.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'sncr-search' ]
+
+
+# If application is already installed, and is a higher version, downgrade
+
+- name: Downgrade Step 1, remove old {{ package_name }}-{{rpm_version.stdout}} package
+  shell: 'rpm -e {{ package_name }}-{{rpm_version.stdout}}'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'sncr-search' ]
+
+- name: Downgrade Step 2, install older {{ package_name }}-{{sncr_search_version}} package
+  shell: 'rpm -ivh {{owm_repo_url}}/{{ package_name }}-{{sncr_search_version}}.noarch.rpm'
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'sncr-search' ]
+
+
+# Check specific version
+
+- name: Get new version of RPM
+  shell: "`which yum` list installed {{ package_name }} | grep installed | awk '{ print $2 }'"
+  register: rpm_version
+  when: rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 )
+  changed_when: False
+  tags: [ 'sncr-search' ]
+  check_mode: no
+
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (upgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 1
+  tags: [ 'sncr-search' ]
+
+- debug:
+     msg: "System has {{ package_name }}-{{rpm_version.stdout}} installed (downgrade)"
+  when: rpm_check.rc == 0 and version_comparison.rc == 2
+  tags: [ 'sncr-search' ]
+
+
+- name: Determine Eureka URL 
+  set_fact:
+      eureka_urls: |
+        {% set comma = joiner(",") %}
+        {% for host in groups[node_site + "-directory"] -%}
+                 {{ comma() }}http://{{host}}:{{eureka_port}}/eureka/{%- endfor %}
+  tags: [ 'sncr-search', 'sncr-search-init' ]
+  
+- debug: msg="sncr-search <server_port> is {{sncr_search_port}}"
+
+- debug: msg="sncr-search <config_host> is '{{conf_server_name}}"
+
+- debug: msg="sncr-search <config_port> is {{confserver_port}}"
+
+- debug: msg="sncr-search <eureka_urls> is {{eureka_urls}}"
+
+- name: Update server port in application config file
+  replace: 
+      dest: '/opt/owm/search/config/application.yml'
+      regexp: '\<server_port\>'
+      replace: '{{sncr_search_port}}'
+  tags: [ 'sncr-search', 'sncr-search-config' ]
+  when: rpm_check.rc != 0 or (rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ))
+      
+- name: Update confserver host in application config file
+  replace:
+      dest: '/opt/owm/search/config/application.yml'
+      regexp: '\<config_host\>'
+      replace: '{{conf_server_name}}'
+  tags: [ 'sncr-search', 'sncr-search-config' ]
+  when: rpm_check.rc != 0 or (rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ))
+
+- name: Update confserver port in application config file
+  replace:
+      dest: '/opt/owm/search/config/application.yml'
+      regexp: '\<config_port\>'
+      replace: '{{confserver_port}}'
+  tags: [ 'sncr-search', 'sncr-search-config' ]
+  when: rpm_check.rc != 0 or (rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ))
+
+- name: Update eureka url in application config file
+  replace:
+      dest: '/opt/owm/search/config/application.yml'
+      regexp: '\<eureka_urls\>'
+      replace: '{{eureka_urls}}'
+  tags: [ 'sncr-search', 'sncr-search-config' ]
+  when: rpm_check.rc != 0 or (rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ))
+
+
+- name: Update ConfigDB for search Service
+  template:
+    src: "config-search.sh.j2"
+    dest: "/tmp/config-search.sh"
+    owner: "{{emailmx_user[0].username}}"
+    group: "{{emailmx_user[0].username}}"
+    mode: 0644
+  tags: [ 'sncr-search', 'sncr-search-configdb' ]
+  when: rpm_check.rc != 0 or (rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ))
+
+- name: Run script config-search.sh
+  shell: "bash /tmp/config-search.sh"
+  tags: [ 'sncr-search', 'sncr-search-configdb' ]
+  when: rpm_check.rc != 0 or (rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ))
+
+- name: Start the Search service
+  shell: nohup /etc/init.d/search start < /dev/null >/dev/null 2>&1 &
+  tags: [ 'sncr-search' ]
+  when: rpm_check.rc != 0 or (rpm_check.rc == 0 and ( version_comparison.rc == 1 or version_comparison.rc == 2 ))
+

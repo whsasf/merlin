@@ -1,0 +1,10 @@
+# Monitorui is now a separate PSO component that installs itself the agents it needs
+# so this role is not required anymore
+#---
+#- hosts: monitorui 
+#  roles:
+#    - common
+#    - owm-nginx
+#    - owm-kibana
+#    - owm-graphite
+#    - nagios

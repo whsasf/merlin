@@ -1,0 +1,283 @@
+---
+# This package is optional, it will only be updated of present, but not installed
+
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+
+- fail:
+    msg: "Could not determine node site"
+  when: node_site is not defined
+
+- name: Determine Ui location
+  set_fact:
+    ui_location: "{{ item.location }}"
+  with_items: "{{ ui_locations }}"
+  when: item.site == node_site
+
+- set_fact:
+    ui_location: "{% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'service' %}{{ interface['address'] }}{% endif %}{% endfor %}"
+  when: ui_location is not defined or ui_location == ""
+
+- fail:
+    msg: "Could not determine ui location"
+  when: ui_location is not defined or ui_location == ""
+
+- set_fact:
+    webtop_tomcat_manager:
+      name: "owm-webtop-tomcat-manager"
+      version: "{{webtop_tomcat_version}}"
+      optional: "{{skip_webtop_tomcat_manager}}"
+      archs:
+        - ".el6.noarch"
+
+# This package is optional, it will only be updated of present, but not installed
+- set_fact:
+    webtop_tomcat_host_manager:
+      name: "owm-webtop-tomcat-host-manager"
+      version: "{{webtop_tomcat_version}}"
+      optional: "{{skip_webtop_tomcat_host_manager}}"
+      archs:
+        - ".el6.noarch"
+
+- set_fact:
+    webtop_media:
+      name: "owm-webtop-media"
+      version: "{{webtop_media_version}}"
+      optional: "no"
+      archs:
+        - ".el6.noarch"
+
+- set_fact:
+    webtop_webmail:
+      name: "owm-webtop-{{webtop_webmail_name}}"
+      version: "{{webtop_webmail_version}}"
+      optional: "no"
+      archs:
+        - ".el6.noarch"
+        - ""
+
+- set_fact:
+    webtop_tomcat:
+      name: "owm-webtop-tomcat"
+      version: "{{webtop_tomcat_version}}"
+      optional: "no"
+      archs:
+        - ".el6.noarch"
+        - ".el6.x86_64"
+
+- name: Determine cluster name
+  set_fact:
+    node_cluster: "{{ item }}"
+  with_items: "{{ clusters }}"
+  when: hostvars[inventory_hostname]['clusterId'] is defined and hostvars[inventory_hostname]['clusterId'] == "{{ item }}"
+  tags: ['owm-webtop' ]
+  
+- fail:
+    msg: "Could not determine cluster name. Ensure the variable 'clusterId' is set in the corresponding host vars file(s)."
+  when: node_cluster is not defined
+
+- name: Get the mOS VIP hostname
+  set_fact:
+    mOSHostName: "{{ item }}-VIP"
+  when: groups[node_site + '-affinity-mos'] is defined and hostvars[item]['clusterId'] == node_cluster
+  with_items: "{{ groups[node_site + '-affinity-mos'] }}"
+  tags: ['owm-webtop' ]
+
+- fail:
+    msg: 'Could not determine mOS VIP hostname. Ensure host is defined for "{{node_site}}-affinity-mos" in the inventory file.'
+  when: mOSHostName is not defined
+
+- name: Installing libtool apr
+  yum: name={{item}} state=present
+  with_items:
+       - "libtool"
+       - "apr"
+  ignore_errors: true
+  tags: ['owm-webtop']
+
+
+- debug:
+    msg: "webmails_to_remove is {{webmails_to_remove}}"
+  when: webmails_to_remove is defined
+
+- name: Check the webmails to remove are actually present
+  shell: 'rpm -qa | grep owm-webtop-{{item}}'
+  with_items: "{{webmails_to_remove}}"
+  register: rpm_remove
+  when: webmails_to_remove is defined and rpm_remove is not defined or rpm_remove.rc != 0
+  ignore_errors: yes
+
+- name: Stop webtop if we have webmails to remove
+  shell: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/bin/imservctrl stop webtop'
+  register: service_stop
+  failed_when: service_stop.rc != 0 and servicetop_stop.rc != 1
+  ignore_errors: True
+  changed_when: no
+  when: rpm_remove is defined and (rpm_remove.results | length > 0) and (rpm_remove.results[(rpm_remove.results | length) -1].rc == 0)
+
+- name: Remove webtop packages
+  shell: 'rpm -e --nodeps {{item}}'
+  with_items: "{{webmails_to_remove}}"
+  when: rpm_remove is defined and (rpm_remove.results | length > 0) and (rpm_remove.results[(rpm_remove.results | length) -1].rc == 0)
+  ignore_errors: yes
+
+- name: Installing owm-webtop-tomcat
+  include: install.yml package="{{webtop_tomcat}}"
+
+- name: Installing owm-webtop-tomcat-manager
+  include: install.yml package="{{webtop_tomcat_manager}}"
+
+- name: Installing owm-webtop-tomcat-host
+  include: install.yml package="{{webtop_tomcat_host_manager}}"
+
+
+- name: Creating softlink of webtop start/stop scripts 
+  shell: 'ln -sf {{emailmx_user[0].home}}/webtop/bin/webtopctl.sh {{emailmx_user[0].home}}/lib/webtopctl;ln -sf {{emailmx_user[0].home}}/webtop/bin/webtopping.sh {{emailmx_user[0].home}}/lib/webtopping'
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: ['owm-webtop']
+  
+- name: Updating additionalServers in config.db
+  shell: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -key "/{{inventory_hostname}}/sysadmin/additionalServers"="webtop webtopctl webtopping"'
+  ignore_errors: true
+  tags: ['owm-webtop']
+  
+- name: Updating webtop_opt in config.db
+  shell: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -key "/{{inventory_hostname}}/sysadmin/webtop_opt"=""'
+  ignore_errors: true
+  tags: ['owm-webtop']
+
+- name: Updating webtop_run in config.db
+  shell: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -key "/{{inventory_hostname}}/sysadmin/webtop_run"="on"'
+  ignore_errors: true
+  tags: ['owm-webtop']
+
+- name: Checking whether rpmforge package is already installed
+  command: rpm -q rpmforge-release
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  check_mode: no
+  tags: ['owm-webtop']
+
+- name: Installing additional repo for some required packages
+  shell: rpm -Uvh {{repoforge_repo_url}}/rpmforge-release-{{rpmforge_release_version}}.el6.rf.x86_64.rpm
+  when: rpm_check.rc != 0
+  tags: ['owm-webtop']
+
+- name: Installing additional packages
+  yum: name={{item}} state=latest
+  with_items:
+       - "xvidcore"
+       - "opencore-amr"
+       - "lame"
+       - "faac"
+       - "alsa-lib"
+       - "SDL"
+  ignore_errors: true
+  tags: ['owm-webtop']
+  
+- name: Get OWM ffmpeg package
+  get_url: url="{{owm_tar_url}}/media/ffmpeg.tar.gz" dest="/root"
+  tags: ['owm-webtop']
+
+- name: Install OWM ffmpeg package
+  unarchive: src="/root/ffmpeg.tar.gz" dest="/usr/local" copy=no
+  tags: ['owm-webtop']
+
+- name: Updating the system configuration to look in /usr/local/lib for shared libraries
+  shell: 'echo /usr/local/lib > /etc/ld.so.conf.d/ffmpeg-libs.conf; ldconfig'
+  ignore_errors: true
+  tags: ['owm-webtop']
+
+- name: Checking whether OpenOffice package is already installed
+  command: rpm -q openoffice
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  ignore_errors: True
+  changed_when: no
+  check_mode: mo
+  tags: ['owm-webtop']
+
+- name: Get Apache OpenOffice package
+  get_url: url="{{owm_tar_url}}/media/Apache_OpenOffice_{{apache_openoffice_version}}_Linux_x86-64_install-rpm_en-US.tar.gz" dest="/root"
+  when: rpm_check.rc != 0
+  tags: ['owm-webtop']
+
+- name: Extracting Apache OpenOffice
+  unarchive: src="/root/Apache_OpenOffice_{{apache_openoffice_version}}_Linux_x86-64_install-rpm_en-US.tar.gz" dest="/root" copy=no
+  when: rpm_check.rc != 0
+  tags: ['owm-webtop']  
+
+- name: Installing Apache open office
+  shell: 'rpm -Uvh /root/en-US/RPMS/*.rpm'
+  when: rpm_check.rc != 0
+  tags: ['owm-webtop']
+  
+- name: Deleting rpm directory
+  shell: 'rm -rf /root/en-US'
+  tags: ['owm-webtop']
+
+- name: Installing owm-webtop-media
+  include: install.yml package="{{webtop_media}}"
+
+- name: Installing owm-webtop-{{webtop_webmail_name}}
+  include: install.yml package="{{webtop_webmail}}"
+
+- name: Updating mOS settings in webtop-config.xml
+  lineinfile: dest={{emailmx_user[0].home}}/webtop/webapps/{{webtop_webmail_webappsname}}/WEB-INF/classes/config/webtop-config.xml regexp='^\s*<mxos url=.*? maxConnections=.*? connectionTimeout=.*? readTimeout=.*? contextId=.*?" ?>$' line='<mxos url="http://{{mOSHostName}}:8081/mxos" maxConnections="50" connectionTimeout="120s" readTimeout="60s" contextId="MXOS-REST-WEBTOP" >' owner={{emailmx_user[0].username}} group={{emailmx_user[0].username}} mode=644 state=present backrefs=yes
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  ignore_errors: "{{ ansible_check_mode }}"
+  tags: ['owm-webtop']  
+
+- name: Updating mOS settings in webtop-config.xml
+  lineinfile: dest={{emailmx_user[0].home}}/webtop/webapps/{{webtop_webmail_webappsname}}/WEB-INF/classes/config/webtop-config.xml regexp='^\s*<mxos url=.*? maxConnections=.*? connectionTimeout=.*? readTimeout=.*? contextId=.*?" ?/>$' line='<mxos url="http://{{mOSHostName}}:8081/mxos" maxConnections="50" connectionTimeout="120s" readTimeout="60s" contextId="MXOS-REST-WEBTOP" />' owner={{emailmx_user[0].username}} group={{emailmx_user[0].username}} mode=644 state=present backrefs=yes
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  ignore_errors: "{{ ansible_check_mode }}"
+  tags: ['owm-webtop']  
+
+- name: Updating webtop-media settings in webtop-config.xml
+  lineinfile: dest={{emailmx_user[0].home}}/webtop/webapps/{{webtop_webmail_webappsname}}/WEB-INF/classes/config/webtop-config.xml regexp='^\s*<service uri=.*? connectionMax=.*? connectionTimeout=.*? socketTimeout=.*? />$' line='<service uri="http://localhost:8080/webtop-media" connectionMax="200" connectionTimeout="5s" socketTimeout="30s" />' owner={{emailmx_user[0].username}} group={{emailmx_user[0].username}} mode=644
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  ignore_errors: "{{ ansible_check_mode }}"
+  tags: ['owm-webtop']
+
+- name: Updating IMAP settings in webtop-config.xml
+  lineinfile: dest={{emailmx_user[0].home}}/webtop/webapps/{{webtop_webmail_webappsname}}/WEB-INF/classes/config/webtop-config.xml regexp='^\s*<store protocol=.*? host=.*? port=.*? starttls=.*?>$' line='<store protocol="imap" host="localhost" port="10143" starttls="false">' owner={{emailmx_user[0].username}} group={{emailmx_user[0].username}} mode=644
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  ignore_errors: "{{ ansible_check_mode }}"
+  tags: ['owm-webtop']
+
+- name: Updating SMTP settings in webtop-config.xml
+  lineinfile: dest={{emailmx_user[0].home}}/webtop/webapps/{{webtop_webmail_webappsname}}/WEB-INF/classes/config/webtop-config.xml regexp='^\s*<transport protocol=.*? host=.*? port=.*? auth=.*? starttls=.*? />$' line='<transport protocol="smtp" host="localhost" port="10025" auth="false" starttls="false" />' owner={{emailmx_user[0].username}} group={{emailmx_user[0].username}} mode=644
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  ignore_errors: "{{ ansible_check_mode }}"
+  tags: ['owm-webtop']
+
+- name: Updating RSVP settings in webtop-config.xml
+  lineinfile: dest={{emailmx_user[0].home}}/webtop/webapps/{{webtop_webmail_webappsname}}/WEB-INF/classes/config/webtop-config.xml regexp='^\s*<rsvp url=.*? />$' line='<rsvp url="{{ui_location}}/{{ webtop_webmail_webappsname }}" />' owner={{emailmx_user[0].username}} group={{emailmx_user[0].username}} mode=644
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  ignore_errors: "{{ ansible_check_mode }}"
+  tags: ['owm-webtop']
+
+- name: Updating shareCalendar settings in webtop-config.xml
+  lineinfile: dest={{emailmx_user[0].home}}/webtop/webapps/{{webtop_webmail_webappsname}}/WEB-INF/classes/config/webtop-config.xml regexp='^\s*<shareCalendar url=.*? />$' line='<shareCalendar url="{{ui_location}}/{{ webtop_webmail_webappsname }}/http/shareCalendar" />' owner={{emailmx_user[0].username}} group={{emailmx_user[0].username}} mode=644
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  ignore_errors: "{{ ansible_check_mode }}"
+  tags: ['owm-webtop']
+
+
+- name: Starting Webtop server
+  shell: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/bin/imservctrl killStart webtop'
+  tags: ['owm-webtop']

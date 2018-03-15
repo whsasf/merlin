@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+#
+# See rbldnsd(8) for descriptions of options.
+#
+RBLDNSD="rbldns -f \
+  -r /var/lib/rbldnsd \
+  -u rbldns \
+  -b localhost/{{ rbldnsd_config_port }} \
+  {{ rbldnsd_config_zone }}:ip4set:sbl \
+  {{ rbldnsd_config_zone }}:ip4set:xbl"

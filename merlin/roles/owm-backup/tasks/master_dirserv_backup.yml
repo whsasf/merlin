@@ -1,0 +1,41 @@
+---
+- name: Create temp directory to store backup
+  file: path={{emailmx_user[0].home}}/imdirserv-back state=directory mode=0755
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-backup','dirserv','dirserv-backup' ]
+ 
+- name: Primary master directory server file backup
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imdirbackup -server imdirserv -budir {{emailmx_user[0].home}}/imdirserv-back'
+  tags: [ 'owm-backup','dirserv','dirserv-backup' ]
+
+- name: Copy the primary master directory server backup files into backup server
+  shell: 'rsync -avz --rsh="ssh -o StrictHostKeyChecking=no -i {{emailmx_user[0].home}}/backup_transfer_keys/backup_transfer.rsa" --progress {{emailmx_user[0].home}}/imdirserv-back/imdirserv.* root@{{backupserver_ip_address}}:{{backup_server_path}}'
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-backup','dirserv','dirserv-backup' ]
+
+- name: Delete temp directory after copying master directory backup files on backup server 
+  file: path={{emailmx_user[0].home}}/imdirserv-back state=absent
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-backup','dirserv','dirserv-backup' ]
+
+- name: Create directory to store script files
+  file: path={{emailmx_user[0].home}}/scripts state=directory mode=0755
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-backup','dirserv','dirserv-cronjob' ]
+
+- name: Master directory backup script
+  template:
+    src: "master_dirserv_backup.sh.j2"
+    dest: "{{emailmx_user[0].home}}/scripts/master_dirserv_backup.sh"
+    owner: "{{emailmx_user[0].username}}"
+    group: "{{emailmx_user[0].username}}"
+    mode: 0644
+  tags: ['owm-backup','dirserv','dirserv-cronjob']
+ 
+- name: Create cron job for master directory backup
+  cron: name="Cron Job for master directory backup" user="{{emailmx_user[0].username}}" minute="{{dirserv_backup[0].minute}}" hour="{{dirserv_backup[0].hour}}" day="{{dirserv_backup[0].day}}" month="{{dirserv_backup[0].month}}" weekday="{{dirserv_backup[0].weekday}}" job="bash {{emailmx_user[0].home}}/scripts/master_dirserv_backup.sh 2> /dev/null 2>&1"
+  tags: ['owm-backup','dirserv','dirserv-cronjob']

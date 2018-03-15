@@ -1,0 +1,18 @@
+---
+- name: Create directory to store script files
+  file: path={{emailmx_user[0].home}}/scripts state=directory mode=0755
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-mss','maintenance' ]
+
+- name: mss maintenance script
+  template:
+    src: "mss_maintenance.sh.j2"
+    dest: "{{emailmx_user[0].home}}/scripts/mss_maintenance.sh"
+    owner: "{{emailmx_user[0].username}}"
+    group: "{{emailmx_user[0].username}}"
+    mode: 0644
+  tags: ['owm-mss','maintenance']
+
+- name: Create cron job for mss maintenance
+  cron: name="Cron Job for mss maintenance" user="{{emailmx_user[0].username}}" minute="{{mss_maintenance[0].minute}}" hour="{{mss_maintenance[0].hour}}" day="{{mss_maintenance[0].day}}" month="{{mss_maintenance[0].month}}" weekday="{{mss_maintenance[0].weekday}}" job="bash {{emailmx_user[0].home}}/scripts/mss_maintenance.sh 2> /dev/null 2>&1"
+  tags: ['owm-mss','maintenance']

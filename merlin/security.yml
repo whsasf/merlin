@@ -1,0 +1,9 @@
+- hosts: security
+  roles:
+    - owm-nessus-server
+    - owm-nmap
+
+- hosts: localhost
+  connection: local
+  roles:
+    - owm-nessus-client

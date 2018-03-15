@@ -1,0 +1,7 @@
+---
+rbldnsd_pkg_state: 'installed'
+rbldnsd_service_state: 'started'
+rbldnsd_service_enabled: 'yes'
+
+rbldnsd_config_port: 1153
+rbldnsd_config_zone: 'dbl.dnsbl'

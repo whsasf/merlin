@@ -1,0 +1,16 @@
+---
+- name: Deleting dump directory
+  file: path={{emailmx_user[0].home}}/dump state=absent
+  tags: [ 'owm-recover','dirserv','secondary' ]
+
+- name: Stop secondary master directory server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl stop imdirserv'
+  tags: [ 'owm-recover','dirserv','secondary' ]
+
+- name: To sync with primary master directory server 
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imdirsync -masterdb -v 1'
+  tags: [ 'owm-recover','dirserv','secondary' ]
+
+- name: Start secondary master directory server
+  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl start imdirserv'
+  tags: [ 'owm-recover','dirserv','secondary' ]

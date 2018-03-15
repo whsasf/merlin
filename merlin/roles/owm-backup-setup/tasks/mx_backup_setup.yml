@@ -1,0 +1,14 @@
+---
+- name: Create directory for backup transfer keys for mx
+  file: path={{emailmx_user[0].home}}/backup_transfer_keys state=directory mode=0755
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-backup-setup','mx' ]
+
+- name: Copy rsa private key for mx
+  copy: src=~/.ssh/id_rsa dest={{emailmx_user[0].home}}/backup_transfer_keys/backup_transfer.rsa owner={{emailmx_user[0].username}} group={{emailmx_user[0].username}} mode=0600
+  tags: [ 'owm-backup-setup','mx' ]
+
+- name: Copy rsa public key for mx
+  copy: src=~/.ssh/id_rsa.pub dest={{emailmx_user[0].home}}/backup_transfer_keys/backup_transfer.pub owner={{emailmx_user[0].username}} group={{emailmx_user[0].username}} mode=0600
+  tags: [ 'owm-backup-setup','mx' ]

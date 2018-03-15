@@ -1,0 +1,58 @@
+# {{ ansible_managed }}
+global
+    chroot /var/lib/haproxy
+    maxconn 8192
+    user haproxy
+    group haproxy
+    daemon
+    log /dev/log local0
+    log /dev/log local1 notice
+
+defaults
+    mode http
+    log /dev/log local1 notice
+
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+    option redispatch
+    option tcplog
+    option dontlognull
+
+frontend fe-mxos 127.0.0.1:18081
+    mode http
+    default_backend be-mxos
+frontend fe-smtp 127.0.0.1:10025
+    mode tcp
+    default_backend be-smtp
+frontend fe-imap 127.0.0.1:10143
+    mode tcp
+    default_backend be-imap
+
+backend be-mxos
+{% if groups['queue'] is defined %}
+{% for host in groups['queue'] %}
+    server {{ host }} {{ host }}:8081 check inter 12000 rise 3 fall 3
+{% endfor %}
+{% endif %}
+    balance roundrobin
+    mode http
+    option httpclose
+backend be-smtp
+{% if groups['smtpout'] is defined %}
+{% for host in groups['smtpout'] %}
+    server {{ host }} {{ host }}:25 check inter 12000 rise 3 fall 3
+{% endfor %}
+{% endif %}
+    balance roundrobin
+    mode tcp
+    option smtpchk
+backend be-imap
+{% if groups['fep'] is defined %}
+{% for host in groups['fep'] %}
+    server {{ host }} {{ host }}:143 check inter 12000 rise 3 fall 3
+{% endfor %}
+{% endif %}
+    server imap01 172.0.0.1:143 check inter 12000 rise 3 fall 3
+    balance roundrobin
+    mode tcp
