@@ -750,8 +750,6 @@
 {% elif interface['vlan'] == "service" %}
 {% if host in groups[node_site] %}
 {{ interface['address'] }}      {{ host + "-" + service_suffix }} {{ host }} {{ search_mata_cluster_name }}
-<<<<<<< HEAD
-=======
 {% else %}
 {{ interface['address'] }}      {{ host + "-" + service_suffix }} {{ host }}
 {% endif %}
