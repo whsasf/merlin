@@ -1,9 +1,5 @@
 ---
-<<<<<<< HEAD
 - hosts: all 
-=======
-- hosts: all
->>>>>>> 962e4ac182cd5758eb15e8097d0ff59b03562f7f
 #  serial: 1
   roles:
     - users

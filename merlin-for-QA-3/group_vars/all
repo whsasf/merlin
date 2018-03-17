@@ -55,10 +55,7 @@ meta_cluster_name: metacluster
 blob_cluster_name: blobcluster
 pim_cluster_name: pimcluster
 qservice_cluster_name: qcluster
-<<<<<<< HEAD
-#search_cluster_name: searchcluster
-=======
->>>>>>> 962e4ac182cd5758eb15e8097d0ff59b03562f7f
+search_cluster_name: searchcluster
 search_mata_cluster_name: search_meta_cluster
 search_blob_cluster_name: search_blob_cluster
 
