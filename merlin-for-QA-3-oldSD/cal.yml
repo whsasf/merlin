@@ -1,0 +1,6 @@
+---
+- hosts: cal
+  serial: 1
+  roles:
+    - owm-common
+    - owm-cal

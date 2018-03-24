@@ -1,0 +1,25 @@
+#! /bin/bash
+
+# Lock the config server
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -lockserver'
+
+# Elasticsearch clusters configuration
+{% for site in sites %}{% 
+	if groups[site+'-elk'] is defined %}
+
+# site={{ site }}
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/common/esConnectionTimeoutInSec"="{{ es_connection_timeout_in_sec }}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/common/maxSearchResults"="{{ es_max_search_results }}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/common/enableESSync"="{{ es_enable_es_sync }}""'
+
+{%		for i in groups[site+'-elk'] %}{%
+			if loop.last %}
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/common/esClusterName"="{{ hostvars[i]['elasticsearch_clusterName'] }}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/common/esEndpoints"="{{ groups[site+'-elk'] | join (':9300\\\\n') }}:9300""'
+{%			endif %}{% 
+		endfor %}{%
+	endif %}{%
+endfor %} 
+
+# Unlock the config server
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -unlockserver'

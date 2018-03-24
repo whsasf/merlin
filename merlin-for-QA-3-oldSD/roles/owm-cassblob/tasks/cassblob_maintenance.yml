@@ -1,0 +1,22 @@
+---
+- name: Create directory to store script files
+  file: path={{cass_user[0].home}}/scripts state=directory mode=0755
+  sudo: yes
+  sudo_user: "{{cass_user[0].username}}"
+  when: "inventory_hostname in groups['{{node_site}}-{{group_id}}']"
+  tags: [ 'owm-cassblob','maintenance' ]
+
+- name: Cassandra maintenance script
+  template:
+    src: "cassblob_maintenance.sh.j2"
+    dest: "{{cass_user[0].home}}/scripts/cassblob_maintenance.sh"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    mode: 0644
+  when: "inventory_hostname in groups['{{node_site}}-{{group_id}}']"
+  tags: ['owm-cassblob','maintenance']
+ 
+- name: Create a cron job for repair,compact and cleanup for cassendra blobstore maintenance
+  cron: name="Cron Job for Cassandra blobstore maintenance" user="{{cass_user[0].username}}" minute="{{cassblob_maintenance[0].minute}}" hour="{{cassblob_maintenance[0].hour}}" day="{{cassblob_maintenance[0].day}}" month="{{cassblob_maintenance[0].month}}" weekday="{{cassblob_maintenance[0].weekday}}" job="bash {{cass_user[0].home}}/scripts/cassblob_maintenance.sh 2> /dev/null 2>&1"
+  when: "inventory_hostname in groups['{{node_site}}-{{group_id}}']"
+  tags: ['owm-cassblob','maintenance']

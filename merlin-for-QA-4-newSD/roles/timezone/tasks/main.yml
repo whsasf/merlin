@@ -1,0 +1,12 @@
+---
+- name: Install tzdata package
+  yum: name={{timezone_package}} state=present
+  tags: [ 'package', 'timezone' ]
+
+- name: Set timezone config
+  template: src="timezone.j2" dest={{timezone_file}} mode=0644
+  tags: [ 'configuration', 'timezone' ]
+
+- name: Set link to localtime
+  file: state=link src={{zoneinfo_dir}}/{{timezone}} dest={{localtime_file}} force=yes
+  tags: [ 'configuration', 'timezone' ]

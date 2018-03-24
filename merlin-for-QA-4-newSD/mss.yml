@@ -1,0 +1,8 @@
+---
+- hosts: mss
+  serial: 1
+  roles:
+    - owm-common
+    - owm-msg-common
+    - owm-mss
+    - owm-mss-configdb

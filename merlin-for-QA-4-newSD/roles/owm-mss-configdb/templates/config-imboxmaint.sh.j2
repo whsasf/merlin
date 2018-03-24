@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Lock the config server
+runuser -l imail -g imail -c 'imconfcontrol -lockserver'
+
+## This is to configure imboxmaint and assign each node a range of group based
+
+{% for site in sites %}{%
+	for cluster in clusters %}{% 
+		set cluster_count=0 %}{% 
+		set maxGroups=0 %}{%
+		for host in groups[site+'-mss'] %}{% 
+			if hostvars[host]['clusterId']==cluster %}{%
+				set maxGroups=maxGroups+maintenance_group_number %}{% 
+				set cluster_count=cluster_count+1 %}
+# site={{site}} host={{host}} cluster={{cluster}} maxGroups={{maxGroups}} 
+runuser -l {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{host}}/imboxmaint/maintenanceGroupidStart""=""{{(cluster_count*maintenance_group_number-maintenance_group_number)}}""'
+runuser -l {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{host}}/imboxmaint/maintenanceGroupidEnd""=""{{(cluster_count-1)*maintenance_group_number+maintenance_group_number-1}}""'
+{% 
+			endif %}{%
+			if loop.last %}
+# maxGroups={{maxGroups}} cluster={{cluster}} site={{site}}
+runuser -l {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{site}}-{{cluster}}/imboxmaint/clusterName""=""{{cluster}}""'
+runuser -l {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{site}}-{{cluster}}/common/clusterMaxMaintenanceGroups""=""{{maxGroups}}""'
+{% 			endif %}{%
+		endfor %}
+{%	endfor %}{%
+endfor %}
+
+# Unlock the config server
+runuser -l imail -g imail -c 'imconfcontrol -unlockserver'

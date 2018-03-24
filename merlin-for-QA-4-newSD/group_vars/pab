@@ -1,0 +1,4 @@
+# Versions of PAB backends
+pab_version: 9.6.000-0
+
+pab_cassmeta_endpoint_port: 9042

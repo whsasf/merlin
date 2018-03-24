@@ -1,0 +1,14 @@
+---
+- name: Cassandra | Download the Cassandra metrics jar
+  get_url:
+    url: "{{owm_tar_url}}/metrics-graphite-2.2.0.jar"
+    dest: "{{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/lib/metrics-graphite-2.2.0.jar"
+  tags: ['owm-cassmeta']
+
+- name: Cassandra | Update the cassandra metrics configuration
+  template:
+    src: "metrics-graphite-config.yaml.j2"
+    dest: "{{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/conf/metrics-graphite-config.yaml"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    mode: 0644

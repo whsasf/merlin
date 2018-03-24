@@ -1,0 +1,4 @@
+---
+blobstore_cluster_port: "9162"
+metadata_cluster_port: "9160"
+duration: "3600"

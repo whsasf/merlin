@@ -1,0 +1,7 @@
+---
+maintenance_group_number: 200
+
+mx_mailboxaging: false
+mailbox_aging_enabled: 'false'
+mailbox_aging_max_age_days: 10
+

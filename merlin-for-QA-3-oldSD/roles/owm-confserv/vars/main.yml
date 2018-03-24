@@ -1,0 +1,3 @@
+---
+# default: 0  This variable indicates whether deploy confcacheserv where confserv is installed.
+conf_cache_server: "0"

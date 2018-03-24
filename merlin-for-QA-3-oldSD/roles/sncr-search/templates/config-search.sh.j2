@@ -1,0 +1,49 @@
+#! /bin/bash
+
+# Lock the config server
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -lockserver'
+
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/search/cassandraKeyspaceName"="search""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/search/blobKeyspaceEnabled"="true""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/search/cassandraBlobKeyspaceName"="search_blob""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/common/enableSearchServer"="true""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/search/cassandraRetryPolicy"="default""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/search/cassandraWriteConsistency"="LOCAL_QUORUM""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/search/cassandraReadConsistency"="LOCAL_QUORUM""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/search/cassandraBlobRetryPolicy"="default""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/search/cassandraBlobWriteConsistency"="LOCAL_QUORUM""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/search/cassandraBlobReadConsistency"="LOCAL_QUORUM""'
+
+{% for site in sites %}{% 
+	if groups[site+'-searchcass'] is defined %}
+
+# site={{ site }}
+
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/search/cassandraPort"="{{cassandra_meta_native_transport_port}}""'
+
+{%		for i in groups[site+'-searchcass'] %}{%
+			if loop.last %}
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/search/cassandraEndpoints"="{{ groups[site+'-searchcass'] | join ('\\\\n' ) }}""'
+{%			endif %}{%
+		endfor %}{%
+	endif %}{%
+endfor %}
+
+
+{% for site in sites %}{% 
+	if groups[site+'-searchblob'] is defined %}
+
+# site={{ site }}
+
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/search/cassandraBlobPort"="{{cassandra_blob_native_transport_port}}""'
+
+{%		for i in groups[site+'-searchblob'] %}{%
+			if loop.last %}
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/search/cassandraBlobEndpoints"="{{ groups[site+'-searchblob'] | join ('\\\\n' ) }}""'
+{%			endif %}{%
+		endfor %}{%
+	endif %}{%
+endfor %}
+
+# Unlock the config server
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -unlockserver'

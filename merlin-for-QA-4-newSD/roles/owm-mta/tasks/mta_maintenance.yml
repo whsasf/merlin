@@ -1,0 +1,19 @@
+---
+- name: Create directory to store script files
+  file: path={{emailmx_user[0].home}}/scripts state=directory mode=0755
+  sudo: yes
+  sudo_user: "{{emailmx_user[0].username}}"
+  tags: [ 'owm-mta','maintenance' ]
+
+- name: Maintenance script for mta
+  template:
+   src: "mta_maintenance.sh.j2"
+   dest: "{{emailmx_user[0].home}}/scripts/mta_maintenance.sh"
+   owner: "{{emailmx_user[0].username}}"
+   group: "{{emailmx_user[0].username}}"
+   mode: 0644
+  tags: ['owm-mta','maintenance']
+
+- name: Create cron job for mta maintenance
+  cron: name="Cron Job for mta maintenance" user="{{emailmx_user[0].username}}" minute="{{mta_maintenance[0].minute}}" hour="{{mta_maintenance[0].hour}}" day="{{mta_maintenance[0].day}}" month="{{mta_maintenance[0].month}}" weekday="{{mta_maintenance[0].weekday}}" job="bash {{emailmx_user[0].home}}/scripts/mta_maintenance.sh 2> /dev/null 2>&1"
+  tags: ['owm-mta','maintenance']

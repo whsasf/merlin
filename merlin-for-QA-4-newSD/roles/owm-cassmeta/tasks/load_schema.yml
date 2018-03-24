@@ -1,0 +1,65 @@
+---
+- pause: seconds=60
+  tags: ['owm-cassmeta']
+
+- name: Cassandra | Load the metadata ring schemas on cassandra
+  template:
+    src: "{{item}}.j2"
+    dest: "{{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/conf/{{item}}"
+    owner: "{{cass_user[0].username}}"
+    group: "{{cass_user[0].username}}"
+    mode: 0644
+    backup: yes
+  with_items:
+    - "meta_schema"
+    - "queueserviceschema.cql"
+    - "pab-cassandra-schema.cql"
+    - "cal-cassandra-schema.cql"
+    - "searchschema.cql"
+    - "create_mx_metadata_mailbox_table.cql"
+    - "create_thumbnail_table.cql"
+  tags: ['owm-cassmeta', 'owm-cassmeta-loadschema']
+
+- name: Create the schema for Pab
+  shell: runuser -l {{cass_user[0].username}} -g {{cass_user[0].username}} -c 'nohup {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/bin/cqlsh --request-timeout=60 {% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'service' %}{{ interface['address'] }}{% endif %}{% endfor %} -f {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/conf/pab-cassandra-schema.cql'
+  when: groups[node_site + "-pabcalcassmeta"] is defined and master is defined and inventory_hostname in groups[node_site + "-pabcalcassmeta"]
+  tags: ['owm-cassmeta', 'owm-cassmeta-loadschema']
+
+- name: Create the schema for Cal
+  shell: runuser -l {{cass_user[0].username}} -g {{cass_user[0].username}} -c 'nohup {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/bin/cqlsh --request-timeout=60 {% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'service' %}{{ interface['address'] }}{% endif %}{% endfor %} -f {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/conf/cal-cassandra-schema.cql'
+  when: groups[node_site + "-pabcalcassmeta"] is defined and master is defined and inventory_hostname in groups[node_site + "-pabcalcassmeta"]
+  tags: ['owm-cassmeta', 'owm-cassmeta-loadschema']
+
+- name: Check MSS schema exists
+  shell: runuser -l {{cass_user[0].username}} -g {{cass_user[0].username}} -c '{{cass_user[0].home}}/cassandra-meta/cassandra/bin/nodetool status KeyspaceMetadata'
+  register: mssschema
+  failed_when: mssschema.rc == 0
+  ignore_errors: True
+  when: groups[node_site + "-cassmeta"] is defined and master is defined and inventory_hostname in groups[node_site + "-cassmeta"]
+  tags: ['owm-cassmeta', 'owm-cassmeta-loadschema']
+
+- name: Cassandra | Apply meta schema on cassandra
+  shell: runuser -l {{cass_user[0].username}} -g {{cass_user[0].username}} -c 'nohup {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/bin/cassandra-cli -host {% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == "service" %}{{ interface['address'] }}{% endif %}{% endfor %} -port {{cassandra_meta_rpc_port}} -f {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/conf/meta_schema'
+  sudo: yes
+  when: groups[node_site + "-cassmeta"] is defined and master is defined and inventory_hostname in groups[node_site + "-cassmeta"] and mssschema.rc > 0
+  tags: ['owm-cassmeta', 'owm-cassmeta-loadschema']
+
+- name: Cassandra | Create thumbnail table
+  shell: runuser -l {{cass_user[0].username}} -g {{cass_user[0].username}} -c 'nohup {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/bin/cqlsh --request-timeout=60 {% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'service' %}{{ interface['address'] }}{% endif %}{% endfor %} -f {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/conf/create_thumbnail_table.cql'
+  when: groups[node_site + "-cassmeta"] is defined and master is defined and inventory_hostname in groups[node_site + "-cassmeta"]
+  tags: ['owm-cassmeta', 'owm-cassmeta-loadschema']
+
+- name: Cassandra | Create Keyspace mx_metadata
+  shell: runuser -l {{cass_user[0].username}} -g {{cass_user[0].username}} -c 'nohup {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/bin/cqlsh --request-timeout=60 {% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'service' %}{{ interface['address'] }}{% endif %}{% endfor %} -f {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/conf/create_mx_metadata_mailbox_table.cql'
+  when: groups[node_site + "-cassmeta"] is defined and master is defined and inventory_hostname in groups[node_site + "-cassmeta"]
+  tags: ['owm-cassmeta', 'owm-cassmeta-loadschema']
+
+- name: Create the schema for queue service
+  shell: runuser -l {{cass_user[0].username}} -g {{cass_user[0].username}} -c 'nohup {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/bin/cqlsh --request-timeout=60 {% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'service' %}{{ interface['address'] }}{% endif %}{% endfor %} -f {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/conf/queueserviceschema.cql'
+  when: groups[node_site + "-qservicecass"] is defined and master is defined and inventory_hostname in groups[node_site + "-qservicecass"]
+  tags: ['owm-cassmeta', 'owm-cassmeta-loadschema']
+
+- name: Create the schema for search service
+  shell: runuser -l {{cass_user[0].username}} -g {{cass_user[0].username}} -c 'nohup {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/bin/cqlsh --request-timeout=60 {% for interface in hostvars[inventory_hostname]['ethernet_interfaces'] %}{% if interface['vlan'] is defined and interface['vlan'] == 'service' %}{{ interface['address'] }}{% endif %}{% endfor %} -f {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/conf/searchschema.cql'
+  when: groups[node_site + "-searchcass"] is defined and master is defined and inventory_hostname in groups[node_site + "-searchcass"]
+  tags: ['owm-cassmeta', 'owm-cassmeta-loadschema']

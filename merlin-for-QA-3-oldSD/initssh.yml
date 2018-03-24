@@ -1,0 +1,18 @@
+# Run this playbook with:
+#
+# ansible-playbook --ask-pass -i inventory initssh.yml
+#
+# This will ask for the root password for your VMs. It will then install
+# the user's public SSH key with the remote root account.
+---
+- hosts: all
+  tasks:
+    - name: Install the required packages
+      yum: name={{ item }} state=present
+      with_items:
+        - libselinux-python
+      tags: [ 'package' ]
+
+    - name: Install ssh public key from current account.
+      authorized_key: user=root key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+      tags: [ "init" ]

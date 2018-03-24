@@ -1,0 +1,11 @@
+---
+- hosts: confserv
+  serial: 1
+  roles:
+    - owm-queue-service-configdb
+    
+- hosts: qservice
+  serial: 1
+  roles:
+    - owm-common
+    - owm-queue-service

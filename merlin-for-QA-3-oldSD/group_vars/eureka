@@ -1,0 +1,34 @@
+#
+#  password is encrypted string of "owm" in /etc/shadow
+#
+eureka_user:
+  - username: owm
+    password: $6$zxiaXucE$w63HLxeD9psAsW6cERr4VOdVKFKmMpcbs6jSFkkQ7yx5H8VpYURml4uM4lJ.VAOpGpTo32SO3g53oV8HI3TUx.
+    name: Eureka user account
+    home: /opt/owm
+    groups: []
+    uid: 5501
+    ssh_key: []
+
+# Limits for 'owm' user.
+limits_scopes:
+  - name: "{{eureka_user[0].username}}"
+    limits:
+     - soft memlock unlimited
+     - hard memlock unlimited
+     - soft as unlimited
+     - hard as unlimited
+     - soft nofile 524288
+     - hard nofile 524288
+     - soft nproc 65536
+     - hard nproc 65536
+     - soft core unlimited
+     - hard core unlimited
+     
+# Define variable for Eureka 
+# You can also define variables in roles/owm-eureka/vars/main.yml
+# Variable for Eureka version
+# Reference: rpmpackges  owm-service-discovery-1.0.3-1.noarch.rpm
+eureka_version: "1.0.3-1"
+#the new eureka servre called:sncr-registry :sncr-registry-2.0.5-0.noarch.rpm
+#eureka_version: "2.0.5-0"

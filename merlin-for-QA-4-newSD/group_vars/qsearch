@@ -1,0 +1,8 @@
+#Note: Change "QUORUM" to "ONE" if the backend has less than two nodes
+
+queue_search_version: 1.0.0.9-7
+queue_search_port: 8014
+install_jdk_7_above: "true"
+
+
+
