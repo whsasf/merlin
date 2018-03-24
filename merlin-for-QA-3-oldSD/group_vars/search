@@ -26,7 +26,7 @@ limits_scopes:
      - hard core unlimited
      
      
-sncr_search_version: 9.6.0-3
+sncr_search_version: 9.6.0-4
 sncr_search_port: 8888
 cassandra_meta_native_transport_port: 9042
 cassandra_blob_native_transport_port: 9043
