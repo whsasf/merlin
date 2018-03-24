@@ -1,0 +1,35 @@
+#! /bin/bash
+
+# Lock the config server
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -lockserver'
+
+# Common configuration keys for queue-service
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/qservice/blobChunkSizeInKb"="{{queue_service_blob_chunk_size_in_kb}}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/qservice/casRetryCount"="{{queue_service_cas_retry_count}}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/qservice/maxMessageSizeInMb"="{{queue_service_max_message_size_in_mb}}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/qservice/maxQueueLength"="{{queue_service_max_queue_length}}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/qservice/maxQueueSizeInMb"="{{queue_service_max_queue_size_in_mb}}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/qservice/queueHighWaterMark"="{{queue_service_queue_high_watermark}}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/*/qservice/queueLowWaterMark"="{{queue_service_queue_low_watermark}}""'
+
+{% for site in sites %}{% 
+	if groups[site+'-qservicecass'] is defined %}
+
+# site={{ site }}
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/qservice/qsBlobKeyspaceName"="blobstore""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/qservice/qsBlobReadConsistencyLevel"="{{queue_service_cassblob_read_consistency}}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/qservice/qsBlobWriteConsistencyLevel"="{{queue_service_cassblob_write_consistency}}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/qservice/qsMetaKeyspaceName"="queueservice""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/qservice/qsMetaReadConsistencyLevel"="{{queue_service_cassmeta_read_consistency}}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/qservice/qsMetaWriteConsistencyLevel"="{{queue_service_cassmeta_write_consistency}}""'
+{%		for i in groups[site+'-qservicecass'] %}{%
+			if loop.last %}
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/qservice/qsBlobEndpoints"="{{ groups[site+'-qservicecass'] | join (':' + ( cassandra_blob_native_transport_port | string ) + '\\\\n' ) }}:{{ cassandra_blob_native_transport_port }}""'
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -nobroadcast -key ""/{{ site }}/qservice/qsMetaEndpoints"="{{ groups[site+'-qservicecass'] | join (':' + ( cassandra_meta_native_transport_port | string ) + '\\\\n' ) }}:{{ cassandra_meta_native_transport_port }}""'
+{%			endif %}{%
+		endfor %}{%
+	endif %}{%
+endfor %}
+
+# Unlock the config server
+runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -unlockserver'

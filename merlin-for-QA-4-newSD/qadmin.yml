@@ -1,0 +1,11 @@
+---
+- hosts: confserv
+  serial: 1
+  roles:
+    - owm-queue-admin-configdb
+    
+- hosts: qadmin
+  serial: 1
+  roles:
+    - owm-common
+    - owm-queue-admin

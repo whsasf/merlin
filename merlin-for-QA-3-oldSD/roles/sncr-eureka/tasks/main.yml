@@ -1,0 +1,69 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{ sites }}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'sncr-eureka','eureka' ]
+
+- name: Check if sncr-registry is installed and what version
+  command: rpm -q sncr-registry
+  register: rpm_check
+  failed_when: rpm_check.rc > 1
+  changed_when: no
+  args:
+    warn: no
+  tags: [ 'sncr-eureka','eureka' ]
+
+- name: Stop sncr-registry before installation if needed
+  service:
+    name: sncr-registry
+    state: stopped
+  notify:
+    - Restart Eureka sncr-registry
+  when: rpm_check.rc == 0 and eureka_version not in rpm_check.stdout
+  tags: [ 'sncr-eureka','eureka' ]
+
+- name: Install sncr-registry-{{eureka_version}} (aka ServiceDiscovery) if not present
+  yum:
+    name: sncr-registry-{{eureka_version}}
+    state: installed
+  notify:
+    - Restart Eureka sncr-registry
+  when: eureka_version not in rpm_check.stdout
+  tags: [ 'sncr-eureka','eureka' ]
+
+- debug: msg="sncr-eureka eureka_port is {{eureka_port}}"
+- debug: msg="sncr-eureka home directory is {{eureka_user[0].home}}"
+- debug: msg="sncr-eureka user is {{eureka_user[0].username}}"
+
+- name: create log directory sncr registry
+  file:
+    path: /var/log/sncr/registry
+    state: directory
+    owner: "{{eureka_user[0].username}}"
+    group: "{{eureka_user[0].username}}"
+    mode: 0755
+  tags: [ 'sncr-eureka','eureka' ]
+
+- name: Install and configure application.yml for version {{eureka_version}}
+  template:
+    src:  "application-{{eureka_version}}.yml.j2"
+    dest: "{{eureka_user[0].home}}/registry/config/application.yml"
+    owner: "{{eureka_user[0].username}}"
+    group: "{{eureka_user[0].username}}"
+    mode: 0755
+  notify:
+    - Restart Eureka sncr-registry
+  tags: [ 'sncr-eureka','eureka' ]
+
+- name: daemon-reload
+  shell: systemctl daemon-reload
+  tags: [ 'sncr-eureka','eureka' ]
+
+- name: Ensure Eureka is started after reboot
+  service:
+    name: sncr-registry
+    enabled: yes
+  tags: [ 'sncr-eureka','eureka' ]
+

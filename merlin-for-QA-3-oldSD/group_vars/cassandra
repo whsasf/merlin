@@ -1,0 +1,44 @@
+# this group cover all your cassandra nodes.
+# if you need more specific configuration remove them from this location
+# to other group (cassmeta, cassmetamss, pabcalmcassmeta, qservicecass, searchcass)
+
+cass_user:
+  - username: cass
+    password: $6$vzC2PhlA$mtdUyuTmKIFP9immoEvdVof4cKgdeabEGN2QgO4BL6csiDVeht6r0wq6L7sS26CpQWw1Tf5Kv/MrZVdGNvi92.
+    name: Cassandra account
+    home: /opt/cass
+    groups: []
+    uid: 501
+    ssh_key: []
+
+# Support users and Cassandra user need to be created on Cassandra nodes.
+cassandra_users: "{{ cass_user + support_users }}"
+
+# Limits for 'cass' user.
+limits_scopes:
+  - name: "{{cass_user[0].username}}"
+    limits:
+     - soft memlock unlimited
+     - hard memlock unlimited
+     - soft as unlimited
+     - hard as unlimited
+     - soft nofile 524288
+     - hard nofile 524288
+     - soft nproc 65536
+     - hard nproc 65536
+     - soft core unlimited
+     - hard core unlimited
+
+#total limits
+#limits_scopes: "{{ limits_scopes1 + limits_scopes2 }}"
+
+# Variable for cassandra version
+cassandra_source_version: "2.1.17"
+#cassandra_source_version: "3.11.1"
+
+# Variable for cassandra maintenance
+cass_maintenance: false
+
+# Variable for cassandra jamm jar version
+jamm_version: 0.3.0
+

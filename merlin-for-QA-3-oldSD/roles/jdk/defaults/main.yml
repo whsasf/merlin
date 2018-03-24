@@ -1,0 +1,4 @@
+---
+jdk_openjdk_version: '1.6.0'
+jdk_gcj_version: '1.4.2'
+jdk_version: '1.8.0_51'

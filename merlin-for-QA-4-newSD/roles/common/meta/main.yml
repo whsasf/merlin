@@ -1,0 +1,16 @@
+---
+dependencies:
+  - { role: selinux_disable }
+  - { role: iptables_disable }
+  - { role: dns }
+  - { role: epel }
+  - { role: owm-repo }
+  - { role: yumrepo }
+#  - { role: ntp }
+  - { role: upgrade-downgrade }
+#  - { role: timezone }
+  - { role: hosts }
+  - { role: hostname }
+#  - { role: nrpe }
+#  - { role: users }
+  - { role: limits }

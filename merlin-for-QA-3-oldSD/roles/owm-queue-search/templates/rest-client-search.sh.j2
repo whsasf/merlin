@@ -1,0 +1,80 @@
+#!/bin/bash
+
+CURL=`which curl`
+PYTHON=`which python`
+RESTHOST=localhost
+RESTPORT={{queue_search_port}}
+
+if [ -z "$CURL" ]; then
+	echo "No curl available"
+	exit 1
+fi
+
+help() {
+
+        echo "Usage:"
+        echo "$0 host <host> port <port> method count key [key] operator [operator] value [value] logicaloperator [logicaloperator]"
+        echo "$0 host <host> port <port> method search key [key] operator [operator] value [value] logicaloperator [logicaloperator]"
+
+}
+
+while [ $# -gt 1 ]; do
+
+        case $1 in
+                host)
+                        shift
+                        RESTHOST=$1
+                        ;;
+                port)
+                        shift
+                        RESTPORT=$1
+                        ;;
+                method)
+                        shift
+                        METHOD=$1
+                        ;;
+                key)
+                        shift
+                        SEARCHKEY=$1
+                        ;;
+                operator)
+                        shift
+                        SEARCHOPERATOR=$1
+                        ;;
+                value)
+                        shift
+                        SEARCHVALUE=$1
+                        ;;
+                logicaloperator)
+                        shift
+                        SEARCHLOGICALOPERATOR=$1
+                        ;;
+                *)
+                        help
+                        exit 1
+                        ;;
+        esac
+
+        shift
+done;
+
+CMD_ID=${RANDOM}
+
+case $METHOD in
+	count)
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueSearch.'${METHOD}'", "params": { "query": [ { "key":"'${SEARCHKEY}'", "operator":"'${SEARCHOPERATOR}'", "value":"'${SEARCHVALUE}'", "logicaloperator":"'${SEARCHLOGICALOPERATOR}'" } ] } }' 2>/dev/null)
+		;;
+	search)
+		CMD=$(${CURL} -L -X POST http://${RESTHOST}:${RESTPORT}/jsonrpc2 -H 'Content-Type:application/json'  -d '{"jsonrpc": "2.0", "id": '${CMD_ID}', "method": "QueueSearch.'${METHOD}'", "params": { "query": [ { "key":"'${SEARCHKEY}'", "operator":"'${SEARCHOPERATOR}'", "value":"'${SEARCHVALUE}'", "logicaloperator":"'${SEARCHLOGICALOPERATOR}'" } ] } }' 2>/dev/null)
+		;;
+	*)
+		help
+		exit 1
+		;;
+esac
+
+if [ -n "$PYTHON" ]; then
+	echo $CMD | python -m json.tool
+else
+	echo $CMD
+fi

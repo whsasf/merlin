@@ -1,0 +1,4 @@
+---
+    - name: reload_profile
+      shell: 'source /etc/profile'
+

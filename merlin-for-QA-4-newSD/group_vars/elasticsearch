@@ -1,0 +1,12 @@
+# Elasticsearch Setup Details
+YML_File: "/etc/elasticsearch"
+elasticsearch_clusterName: "elasticcluster"
+elasticsearch_bind_host: "0.0.0.0"
+elasticsearch_http_port: "9200"
+elasticsearch_http_enabled: "true"
+
+# This specifies NGNIX software loadbalancer portnumber
+elasticsearch_load_balancer_port: "55014"
+
+elasticsearch_rpm_version: "2.0.0"
+

@@ -1,0 +1,58 @@
+haproxy_config_template: uxsuite.cfg.j2
+
+webtop_tomcat_version: 7.0.52-6
+
+rpmforge_release_version: 0.5.3-1
+
+apache_openoffice_version: 4.0.1
+
+webtop_media_version: 1.0.6-1
+
+
+# Webtop webmail package definition
+#
+# The different webmails (kiwi-methane, kiwi-octane, kiwi-ux ...) use different
+# package names, rpm file names, arch names, webapps names ...
+# The following variables must be specified accordingly to the webmail being installed.
+#
+# Also mind that the corresponding rpm file name in repo must be:
+#
+# owm-webtop-{{webtop_webmail_name}}-{{webtop_webmail_version}}xxx.rpm
+#
+# example:
+# 
+# owm-webtop-kiwi-uxdevelop-release-2.2.107-51.rpm
+# or
+# owm-webtop-kiwi-uxdevelop-release-2.2.107-51.el6.noarch.rpm
+#
+
+webtop_webmail_name: kiwi-octane
+webtop_webmail_version: 2.0.35-0
+webtop_webmail_webappsname: kiwi-octane
+
+
+# Webtop tomcat manager is optional, so it's not installed by default,
+# but it will upgraded if it's already installed.
+# To force its installation, set the following varible to "no".
+skip_webtop_tomcat_manager: "yes"
+
+
+# Webtop tomcat host manager is optional, so it's not installed by default,
+# but it will upgraded if it's already installed
+# To force its installation, set the following varible to "no".
+skip_webtop_tomcat_host_manager: "yes"
+
+
+# If upgrading/downgrading between different webmails (for example from kiwi-octane to kiwi-ux)
+# specify in the webmails_to_remove variable, the webmail(s) to remove.
+# Removal will be done prio to install / upgrade
+#
+# Example:
+# webmails_to_remove:
+#   - "kiwi-methane"
+
+
+
+# Webtop requires Oracle JDK 1.7
+install_jdk_7_above: "true"
+

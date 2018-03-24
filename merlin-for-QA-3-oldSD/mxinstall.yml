@@ -1,0 +1,28 @@
+---
+#- include: bootstrap.yml
+#- include: initssh.yml --ask-pass
+#- include: common.yml
+#- include: jdk.yml
+#- include: cassmeta.yml 
+#- include: cassblob.yml 
+- include: user.yml
+- include: eureka.yml
+- include: confserv.yml
+- include: dirserv.yml
+- include: dircacheserv.yml
+- include: mxos.yml
+- include: mss.yml
+- include: imap.yml
+- include: pop.yml
+- include: mta.yml
+- include: queue.yml
+- include: extserv.yml
+- include: qadmin.yml
+- include: elasticsearch.yml
+- include: qsearch.yml
+- include: qservice.yml
+- include: pab.yml
+- include: cal.yml
+- include: search.yml
+- include: platformtools.yml
+- include: restartmx.yml

@@ -1,0 +1,6 @@
+---
+- hosts: confserv
+  serial: 1
+  roles:
+    - owm-common
+    - owm-confserv

@@ -1,0 +1,44 @@
+---
+- name: Determine site name
+  set_fact:
+    node_site: "{{ item }}"
+  with_items: "{{sites}}"
+  when: groups[item] is defined and inventory_hostname in groups[item]
+  tags: [ 'owm-mss-confidb', 'owm-mss-configdb-init', 'mx' ]
+
+- name: Verify Target is Primary Conf Server
+  set_fact:
+    proceed: true
+  with_items: "{{groups['confserv']}}"
+  when: "inventory_hostname == item and hostvars[inventory_hostname]['primary'] is defined"
+  tags: [ 'owm-mss-confidb', 'owm-mss-configdb-init', 'mx' ]
+
+- name: Update ConfigDB for Maintenance
+  template:
+    src: "config-imboxmaint.sh.j2"
+    dest: "/tmp/config-imboxmaint.sh"
+    owner: "{{emailmx_user[0].username}}"
+    group: "{{emailmx_user[0].username}}"
+    mode: 0644
+  when: "proceed is defined and mx_maintenance"
+  tags: [ 'owm-mss-configdb', 'maintenance' ]
+
+- name: Run script config-imboxmaint.sh
+  shell: "bash /tmp/config-imboxmaint.sh"
+  when: "proceed is defined and mx_maintenance"
+  tags: [ 'owm-mss-configdb', 'maintenance' ]
+
+- name: Update ConfigDB for Mailbox Aging
+  template:
+    src: "config-mailboxaging.sh.j2"
+    dest: "/tmp/config-mailboxaging.sh"
+    owner: "{{emailmx_user[0].username}}"
+    group: "{{emailmx_user[0].username}}"
+    mode: 0644
+  when: "proceed is defined and mx_mailboxaging"
+  tags: [ 'owm-mss-configdb', 'mailboxaging' ]
+
+- name: Run script config-imboxmaint.sh
+  shell: "bash /tmp/config-mailboxaging.sh"
+  when: "proceed is defined and mx_mailboxaging"
+  tags: [ 'owm-mss-configdb', 'mailboxaging' ]
