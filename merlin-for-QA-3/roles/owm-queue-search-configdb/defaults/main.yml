@@ -1,4 +1,0 @@
----
-es_max_search_results: 500
-es_connection_timeout_in_sec: 5
-es_enable_es_sync: 'true'

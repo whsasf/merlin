@@ -1,5 +1,0 @@
-# Only Support users need to be created on DNS nodes.
-dns_users: "{{ support_users }}"
-
-# Allow recursion so DNS lookups get forwarded to the DNS root servers.
-bind_config_recursion: "yes"

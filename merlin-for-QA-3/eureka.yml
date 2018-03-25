@@ -1,6 +1,0 @@
----
-- hosts: eureka
-#  serial: 1
-  roles:
-    - sncr-eureka
-

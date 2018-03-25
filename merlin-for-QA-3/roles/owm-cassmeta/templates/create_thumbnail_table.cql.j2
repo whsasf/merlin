@@ -1,8 +1,0 @@
-CREATE TABLE IF NOT EXISTS "KeyspaceMetadata"."CF_Thumbnail" 
-                   (msguuid timeuuid PRIMARY KEY, 
-                    folderuuid timeuuid, 
-                    mailboxid text, 
-                    thumbnailblob blob);
-
-CREATE INDEX IF NOT EXISTS ON "KeyspaceMetadata"."CF_Thumbnail" (folderuuid);
-CREATE INDEX IF NOT EXISTS ON "KeyspaceMetadata"."CF_Thumbnail" (mailboxid);

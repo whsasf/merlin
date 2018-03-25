@@ -1,7 +1,0 @@
----
-- hosts: queue
-  serial: 1
-  roles:
-    - owm-common
-    - owm-msg-common
-    - owm-queue

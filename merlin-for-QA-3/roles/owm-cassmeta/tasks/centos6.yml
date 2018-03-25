@@ -1,5 +1,0 @@
----
-- name: Cassandra | Start the cassandra process
-  shell: runuser -l {{cass_user[0].username}} -g {{cass_user[0].username}} -c 'nohup {{cass_user[0].home}}/cassandra-meta/apache-cassandra-{{cassandra_source_version}}/bin/cassandra -Dcassandra.metricsReporterConfigFile=metrics-reporter-config.yaml'
-  sudo: yes 
-  tags: [ 'owm-cassmeta', 'owm-cassmeta-startup' ]

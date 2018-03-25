@@ -114,8 +114,20 @@ CREATE TABLE IF NOT EXISTS IndexFragments (
     version int,            // Version of indexed data - usefull to trigger re-indexation when analysis is modified
     termsif blob,           // Terms index fragment
     positionsif blob,       // Positions index fragment
+    attachsif blob,
+    attachpositionsif blob,
+    partial boolean,
+    clientVersion int,
     PRIMARY KEY ((docType, userId, bucket), folderId, docId)
 ) WITH CLUSTERING ORDER BY (folderId DESC, docId DESC)
     AND COMPACTION = { 'class' : 'LeveledCompactionStrategy' };
 
+CREATE TABLE metaDataProperties (
+    docType text,           // document type
+    field int,              // Field id
+    name text,              // Property name
+    inactive boolean,       // Indicates property is inactive (no more indexed). Null or missing indicates active.
+    tag timeuuid,           // Property tag (used to handle concurrent configuration updates)
+    PRIMARY KEY (docType, name)
+) WITH COMPACTION = { 'class' : 'LeveledCompactionStrategy' };
 

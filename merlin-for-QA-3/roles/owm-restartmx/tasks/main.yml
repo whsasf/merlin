@@ -1,5 +1,0 @@
----
-- name: restart mx
-  command: runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c '{{emailmx_user[0].home}}/lib/imservctrl killStart'
-  when: inventory_hostname in groups.mx
-  tags: ['restartmx', 'all']

@@ -1,6 +1,0 @@
----
-- hosts: search
-  serial: 1
-  roles:
-#    - owm-common
-    - sncr-search

@@ -1,7 +1,0 @@
----
-- hosts: dircacheserv
-  serial: 1
-  roles:
-    - owm-common
-    - owm-sur-common
-    - owm-dircacheserv

@@ -1,8 +1,0 @@
----
-nrpe_pid: /var/run/nrpe/nrpe.pid
-nrpe_user: nrpe
-nrpe_group: nrpe
-nrpe_service: nrpe
-nrpe_dir: /etc/nagios
-nrpe_include_dir: /etc/nrpe.d
-nrpe_plugins_dir: /usr/lib64/nagios/plugins

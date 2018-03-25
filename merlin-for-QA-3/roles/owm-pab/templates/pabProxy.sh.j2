@@ -1,6 +1,0 @@
-#! /bin/bash
-
-# Set the proxy mode in config.db
-host=`cat {{emailmx_user[0].home}}/config/hostname`
-runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c "imconfcontrol -install -key \"/$host/pabd/proxyServerMode\"=\"true\""
-

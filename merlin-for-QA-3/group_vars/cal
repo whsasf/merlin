@@ -1,4 +1,0 @@
-# Versions of CAL backends
-cal_version: 9.6.000-0
-
-cal_cassmeta_endpoint_port: 9042

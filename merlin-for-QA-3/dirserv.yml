@@ -1,7 +1,0 @@
----
-- hosts: dirserv
-  serial: 1
-  roles:
-    - owm-common
-    - owm-sur-common
-    - owm-dirserv

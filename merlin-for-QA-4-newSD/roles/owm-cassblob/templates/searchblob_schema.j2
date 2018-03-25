@@ -33,6 +33,10 @@ CREATE TABLE IndexFragments (
     version int,            // Version of indexed data - usefull to trigger re-indexation when analysis is modified
     termsif blob,           // Terms index fragment
     positionsif blob,       // Positions index fragment
+    attachsif blob,         // Attachment terms index fragment
+    attachpositionsif blob, // Attachment positions index fragment
+    partial boolean,        // Indicates indexation is complete or not (null or non existing means completed)
+    clientVersion int,      // Client index version - useful to trigger re-indexation when client changes its configuration
     PRIMARY KEY ((docType, userId, bucket), folderId, docId)
 ) WITH CLUSTERING ORDER BY (folderId DESC, docId DESC)
     AND COMPACTION = { 'class' : 'LeveledCompactionStrategy' };

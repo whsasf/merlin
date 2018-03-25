@@ -1,4 +1,0 @@
-# mOS variables for mOS role
-install_jdk_7_above: "true"
-mos_version:  "2.4.14-1"
-mos_third_party_version:  "2.4.2-1"

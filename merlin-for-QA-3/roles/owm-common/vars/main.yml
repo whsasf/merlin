@@ -1,4 +1,0 @@
----
-# The values need to be changed. For Admin Port(6002) and Conf Server(6003)
-conf_server_admin_port: "{{ PORTSOFFSET + 6002 }}"
-conf_server_port: "{{ PORTSOFFSET + 6003 }}"

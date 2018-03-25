@@ -1,6 +1,0 @@
----
-- hosts: mxos 
-  serial: 1
-  roles:
-    - owm-common
-    - owm-mos

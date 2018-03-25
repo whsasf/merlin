@@ -1,7 +1,0 @@
----
-elasticsearch_env_include: "elasticsearch.in.sh"
-elasticsearch_source_env_include_path: "/usr/share/elasticsearch/bin/"
-elasticsearch_local_env_include_path: "/usr/local/share/elasticsearch/"
-elasticsearch_user: "elasticsearch"
-elasticsearch_group: "elasticsearch"
-elasticsearch_heap_size: "1g"

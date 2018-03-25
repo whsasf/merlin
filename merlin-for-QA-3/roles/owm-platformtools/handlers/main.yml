@@ -1,4 +1,0 @@
----
-    - name: reload_profile
-      shell: 'source {{emailmx_user[0].home}}/.profile'
-
