@@ -80,12 +80,12 @@ cassmeta_maintenance:
      month: "*"
      weekday: "*"
 
-cassblob_maintenance:
-  - minute: "0"
-    hour: "2"
-    day: "*"
-    month: "*"
-    weekday: "*"
+#cassblob_maintenance:
+#  - minute: "0"
+#    hour: "2"
+#    day: "*"
+#    month: "*"
+#    weekday: "*"
 
 # The below is configured to run backup
 cassandra_backup:

@@ -34,12 +34,12 @@ elasticsearch_data_enabled: "true"
 cassandra_rack: RAC1  
 
 # The below is configured to run maintenance task
-queue_maintenance:
-   - minute: "1"
-     hour: "0"
-     day: "*"
-     month: "*"
-     weekday: "*"
+#queue_maintenance:
+#   - minute: "1"
+#     hour: "0"
+#     day: "*"
+#     month: "*"
+#     weekday: "*"
 
      
 # The below is configured to run maintenance
@@ -59,9 +59,9 @@ cassandra_backup:
      weekday: "*"
 
 # The below is configured to run maintenance task
-mta_maintenance:
-   - minute: "1"
-     hour: "2"
-     day: "*"
-     month: "*"
-     weekday: "*"     
+#mta_maintenance:
+#   - minute: "1"
+#     hour: "2"
+#     day: "*"
+#     month: "*"
+#     weekday: "*"     

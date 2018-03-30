@@ -28,8 +28,8 @@ limits_scopes:
 #emailmx_version: 9.6.0.0-173
 #emailmx_version: 9.6.0.0-171
 #emailmx_version: 9.6.0.0-170
-#emailmx_version: 9.5.2.0-1
-emailmx_version: 9.5.2.0-5
+#emailmx_version: 9.5.1.0-161
+emailmx_version: 9.5.2.0-7
 platformtools_version: "1.0.33-8"
 domain_name: "openwave.com"
 
