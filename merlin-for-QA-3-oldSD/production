@@ -39,7 +39,7 @@ mx1 ansible_ssh_host=10.49.58.239
 
 [site1-confserv]
 mx1 ansible_ssh_host=10.49.58.239 primary=true
-mx2 ansible_ssh_host=10.49.58.240 
+#mx2 ansible_ssh_host=10.49.58.240 
 [site2-confserv]
 
 [site1-dirserv]
@@ -59,6 +59,7 @@ mx3 ansible_ssh_host=10.49.58.241
 [site1-mss]
 mx1 ansible_ssh_host=10.49.58.239
 mx2 ansible_ssh_host=10.49.58.240
+#mx3 ansible_ssh_host=10.49.58.241
 [site2-mss]
 #mx4 ansible_ssh_host=10.49.58.121
 
@@ -116,7 +117,7 @@ mx3 ansible_ssh_host=10.49.58.241
 [site1-platformtools]
 mx1 ansible_ssh_host=10.49.58.239
 mx2 ansible_ssh_host=10.49.58.240
-#mx3 ansible_ssh_host=10.49.58.241
+mx3 ansible_ssh_host=10.49.58.241
 [site2-platformtools]
 #mx4 ansible_ssh_host=10.49.58.121
 

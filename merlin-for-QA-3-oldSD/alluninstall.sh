@@ -18,6 +18,7 @@ do
 		ssh root@$tmp "su - imail -c \"imboxdelete concuser@openwave.com\""
 		ssh root@$tmp "systemctl stop sncr-registry"
 		ssh root@$tmp "ps -ef|grep "sncr-registry"  |grep -v grep|awk '{print \$2}'|xargs kill -9"
+                ssh root@$tmp "ps -ef|grep "service-discovery"  |grep -v grep|awk '{print \$2}'|xargs kill -9"
 		ssh root@$tmp "/etc/init.d/search  stop"
 		ssh root@$tmp "ps -ef|grep "search"  |grep -v grep|awk '{print \$2}'|xargs kill -9"
 		ssh root@$tmp "ps -ef|grep -iw imail|grep -v ssh|grep -v auto|awk '{print \$2}'|xargs kill -9"
