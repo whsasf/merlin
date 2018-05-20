@@ -10,7 +10,7 @@ server:
 eureka:
   client:
     registerWithEureka: false
-    fetchRegistry: false
+    fetchRegistry: true
     serviceUrl:
       defaultZone:
         {% set comma = joiner(",") %}
