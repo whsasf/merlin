@@ -2,6 +2,7 @@
 # Set the ldapReadThroughEnabled key in config.db
 runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -key "/{{inventory_hostname}}/mxos/ldapReadThroughEnabled"="true"'
 
+
 # Set the ldapReplicationAgreement key in config.db
 runuser -l {{emailmx_user[0].username}} -g {{emailmx_user[0].username}} -c 'imconfcontrol -install -key "/*/imdircacheserv/ldapReplicationAgreement"="cn: defaultReplicationAgreement\nupdateInterval: 600\nupdateintervalasmillisecs: 0"'
 

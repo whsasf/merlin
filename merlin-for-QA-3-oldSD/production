@@ -102,10 +102,12 @@ mx2 ansible_ssh_host=10.49.58.240
 [site2-qservice]
 
 [site1-pab]
+#mx2 ansible_ssh_host=10.49.58.240
 mx3 ansible_ssh_host=10.49.58.241
 [site2-pab]
 
 [site1-cal]
+#mx2 ansible_ssh_host=10.49.58.240
 mx3 ansible_ssh_host=10.49.58.241
 [site2-cal]
 
